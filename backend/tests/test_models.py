@@ -27,3 +27,60 @@ def test_session_factory_executes_sql() -> None:
         value = session.execute(text("select 1")).scalar_one()
 
     assert value == 1
+
+
+def test_orm_can_create_core_records() -> None:
+    from datetime import date
+
+    from app.models.base import Base
+    from app.models.imports import ImportJob, RawDataset
+    from app.models.settings import Marketplace, Organization, SellerAccount
+
+    engine = create_sync_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as session:
+        org = Organization(name="Internal Team", slug="internal")
+        seller = SellerAccount(
+            organization=org,
+            display_name="US Store A",
+            amazon_seller_id="A1SELLER",
+        )
+        marketplace = Marketplace(
+            seller_account=seller,
+            marketplace_id="ATVPDKIKX0DER",
+            region="americas",
+            country_code="US",
+            timezone="America/Los_Angeles",
+            currency_code="USD",
+        )
+        job = ImportJob(
+            seller_account=seller,
+            marketplace=marketplace,
+            source="manual_file",
+            report_type="business_report",
+            date_range_start=date(2026, 5, 25),
+            date_range_end=date(2026, 5, 25),
+            status="pending",
+        )
+        dataset = RawDataset(
+            import_job=job,
+            seller_account=seller,
+            marketplace=marketplace,
+            source="manual_file",
+            report_type="business_report",
+            date_range_start=date(2026, 5, 25),
+            date_range_end=date(2026, 5, 25),
+            schema_version="business_report.v1",
+            raw_file_path="storage/raw/business.csv",
+            raw_file_checksum="abc123",
+            row_count=1,
+            data_status="stable",
+            data_version="2026-05-25-1",
+        )
+        session.add(dataset)
+        session.commit()
+
+        assert dataset.id is not None
+        assert dataset.seller_account.display_name == "US Store A"
