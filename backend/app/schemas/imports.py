@@ -19,6 +19,7 @@ class ImportPreviewResponse(BaseModel):
     required_columns_present: bool
     missing_columns: list[str]
     sample_rows: list[dict[str, str]]
+    data_status: DataStatus
 
 
 class RawDatasetEnvelopeSchema(BaseModel):
