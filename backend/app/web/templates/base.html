@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }} - Amazon Daily Copilot</title>
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body>
+    <aside>
+      <strong>Amazon Daily Copilot</strong>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/imports">Data Import</a>
+        <a href="/reports">Report Center</a>
+        <a href="/settings">Settings</a>
+      </nav>
+    </aside>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

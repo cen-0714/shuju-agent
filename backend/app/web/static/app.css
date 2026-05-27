@@ -1,0 +1,52 @@
+body {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  color: #17202a;
+  background: #f6f7f9;
+}
+
+aside {
+  background: #111827;
+  color: #ffffff;
+  padding: 24px;
+}
+
+nav {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+nav a {
+  color: #ffffff;
+  text-decoration: none;
+  padding: 8px 0;
+}
+
+main {
+  padding: 32px;
+}
+
+section,
+form {
+  max-width: 920px;
+  background: #ffffff;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 8px 10px;
+}

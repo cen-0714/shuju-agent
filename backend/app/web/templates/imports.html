@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Data Import</h1>
+<form method="post" action="/api/imports/preview" enctype="multipart/form-data">
+  <label>Report type <input name="report_type" value="business_report"></label>
+  <label>Start date <input name="date_range_start" type="date"></label>
+  <label>End date <input name="date_range_end" type="date"></label>
+  <label>File <input name="file" type="file"></label>
+  <button type="submit">Preview Import</button>
+</form>
+{% endblock %}
