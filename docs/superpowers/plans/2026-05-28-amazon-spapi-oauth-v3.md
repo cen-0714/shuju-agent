@@ -1587,7 +1587,7 @@ git commit -m "feat: expose amazon oauth endpoints"
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Update README**
+- [x] **Step 1: Update README**
 
 Modify `README.md` sections.
 
@@ -1646,7 +1646,7 @@ Amazon Developer Console 中配置：
 不建议公网暴露后台页面、导入接口、报告接口、设置接口或 `/docs`。
 ```
 
-- [ ] **Step 2: Run focused V3 tests**
+- [x] **Step 2: Run focused V3 tests**
 
 Run:
 
@@ -1657,7 +1657,7 @@ python -m pytest tests/test_amazon_oauth_models.py tests/test_token_cipher.py te
 
 Expected: PASS.
 
-- [ ] **Step 3: Run all backend tests**
+- [x] **Step 3: Run all backend tests**
 
 Run:
 
@@ -1668,7 +1668,7 @@ python -m pytest -q
 
 Expected: PASS, existing 48 tests plus new V3 tests.
 
-- [ ] **Step 4: Run lint**
+- [x] **Step 4: Run lint**
 
 Run:
 
@@ -1679,7 +1679,7 @@ python -m ruff check .
 
 Expected: `All checks passed!`
 
-- [ ] **Step 5: Verify migrations**
+- [x] **Step 5: Verify migrations**
 
 With Docker Postgres running:
 
@@ -1690,7 +1690,7 @@ python -m alembic upgrade head
 
 Expected: migration reaches `20260528_0003 (head)`.
 
-- [ ] **Step 6: Commit Task 5**
+- [x] **Step 6: Commit Task 5**
 
 Run:
 

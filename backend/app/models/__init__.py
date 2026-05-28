@@ -1,5 +1,5 @@
-from app.models.audit import AuditLog
 from app.models.amazon import AmazonAuthorization, AmazonAuthorizationSession
+from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.imports import ImportJob, RawDataset, RawReportRow
 from app.models.metrics import DailyMetric, MetricDefinition

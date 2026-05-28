@@ -126,7 +126,11 @@ def handle_authorization_callback(
         raise AmazonOAuthError("selling_partner_id does not match authorization session")
 
     redirect_uri = build_public_url(settings, settings.AMAZON_OAUTH_REDIRECT_PATH)
-    if not redirect_uri or not settings.AMAZON_LWA_CLIENT_ID or not settings.AMAZON_LWA_CLIENT_SECRET:
+    if (
+        not redirect_uri
+        or not settings.AMAZON_LWA_CLIENT_ID
+        or not settings.AMAZON_LWA_CLIENT_SECRET
+    ):
         raise AmazonOAuthError("Amazon OAuth configuration is incomplete", status_code=500)
 
     try:
