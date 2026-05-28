@@ -19,6 +19,8 @@ class ImportJob(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(40))
     error_code: Mapped[str | None] = mapped_column(String(80))
     error_message: Mapped[str | None] = mapped_column(Text)
+    original_filename: Mapped[str | None] = mapped_column(String(500))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     seller_account = relationship("SellerAccount")
     marketplace = relationship("Marketplace")
@@ -49,6 +51,7 @@ class RawDataset(TimestampMixin, Base):
     import_job: Mapped[ImportJob] = relationship(back_populates="raw_dataset")
     seller_account = relationship("SellerAccount")
     marketplace = relationship("Marketplace")
+    raw_rows: Mapped[list["RawReportRow"]] = relationship(back_populates="raw_dataset")
 
     __table_args__ = (
         UniqueConstraint("seller_account_id", "marketplace_id", "report_type", "raw_file_checksum"),
@@ -62,3 +65,5 @@ class RawReportRow(Base):
     raw_dataset_id: Mapped[int] = mapped_column(ForeignKey("raw_datasets.id"))
     row_number: Mapped[int] = mapped_column(Integer)
     row_json: Mapped[str] = mapped_column(Text)
+
+    raw_dataset: Mapped[RawDataset] = relationship(back_populates="raw_rows")

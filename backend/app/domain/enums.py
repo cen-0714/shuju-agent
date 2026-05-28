@@ -29,7 +29,31 @@ class DataStatus(StrEnum):
 
 class ImportJobStatus(StrEnum):
     PENDING = "pending"
+    PREVIEWED = "previewed"
     VALIDATED = "validated"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    DELETED = "deleted"
+
+
+class ReportScopeType(StrEnum):
+    ALL_STORES = "all_stores"
+    SINGLE_STORE = "single_store"
+
+
+class ReportKind(StrEnum):
+    SINGLE_DAY = "single_day"
+    DATE_RANGE = "date_range"
+
+
+class ReportStatus(StrEnum):
+    ACTIVE = "active"
+    STALE = "stale"
+    FAILED = "failed"
+
+
+class LLMStatus(StrEnum):
+    SKIPPED = "skipped"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
 

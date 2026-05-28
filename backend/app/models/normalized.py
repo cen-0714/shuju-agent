@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import Date, ForeignKey, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -23,3 +23,7 @@ class NormalizedBusinessDaily(Base):
     page_views: Mapped[int] = mapped_column(default=0)
     conversion_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
     buy_box_percentage: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+
+    raw_dataset = relationship("RawDataset")
+    seller_account = relationship("SellerAccount")
+    marketplace = relationship("Marketplace")
