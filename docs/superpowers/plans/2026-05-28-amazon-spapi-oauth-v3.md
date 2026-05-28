@@ -1154,7 +1154,7 @@ git commit -m "feat: add amazon oauth service"
 - Create: `backend/app/schemas/amazon.py`
 - Create: `backend/tests/test_api_amazon_auth.py`
 
-- [ ] **Step 1: Write API tests**
+- [x] **Step 1: Write API tests**
 
 Create `backend/tests/test_api_amazon_auth.py`:
 
@@ -1376,7 +1376,7 @@ def test_authorizations_endpoint_does_not_return_refresh_token() -> None:
     assert "encrypted-refresh-token" not in response.text
 ```
 
-- [ ] **Step 2: Run API tests to verify they fail**
+- [x] **Step 2: Run API tests to verify they fail**
 
 Run:
 
@@ -1387,7 +1387,7 @@ python -m pytest tests/test_api_amazon_auth.py -q
 
 Expected: FAIL because `app.api.routes.amazon_auth` and `app.schemas.amazon` do not exist yet.
 
-- [ ] **Step 3: Add dependencies and schemas**
+- [x] **Step 3: Add dependencies and schemas**
 
 Modify `backend/app/api/deps.py`:
 
@@ -1442,7 +1442,7 @@ class AmazonAuthorizationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 ```
 
-- [ ] **Step 4: Add API router**
+- [x] **Step 4: Add API router**
 
 Create `backend/app/api/routes/amazon_auth.py`:
 
@@ -1562,7 +1562,7 @@ from app.api.routes.amazon_auth import router as amazon_auth_router
 app.include_router(amazon_auth_router, prefix="/api")
 ```
 
-- [ ] **Step 5: Run API tests**
+- [x] **Step 5: Run API tests**
 
 Run:
 
@@ -1573,7 +1573,7 @@ python -m pytest tests/test_api_amazon_auth.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 Run:
 
