@@ -1,6 +1,6 @@
 # Amazon Daily Copilot
 
-内部使用的 Amazon 多店铺日常运营数据分析工具。当前版本面向手动导出文件导入、数据落库、报告生成和后续 API 接入前的业务闭环验证。
+内部使用的 Amazon 多店铺日常运营数据分析工具。当前版本面向手动导出文件导入、数据落库、报告生成，以及 Amazon SP-API 授权接入前的业务闭环验证。
 
 ## 当前功能
 
@@ -28,7 +28,12 @@
 在项目根目录执行：
 
 ```powershell
-Copy-Item .env.example .env
+@"
+DATABASE_URL=postgresql+psycopg://copilot:copilot@localhost:5432/copilot
+STORAGE_ROOT=backend/storage
+LLM_PROVIDER=mock
+"@ | Set-Content -Encoding UTF8 .env
+
 cd backend
 python -m pip install -e ".[dev]"
 cd ..
@@ -43,6 +48,7 @@ python -m uvicorn app.main:app --reload --port 8000
 - 页面入口：http://127.0.0.1:8000/
 - API 文档：http://127.0.0.1:8000/docs
 - 健康检查：http://127.0.0.1:8000/api/health
+- Amazon OAuth 配置状态：http://127.0.0.1:8000/api/auth/amazon/status
 
 ## 常用命令
 
@@ -161,7 +167,7 @@ LLM_TIMEOUT_SECONDS=30
 
 V3 只实现授权回调和 refresh token 加密保存，不会自动拉取订单、库存、报表或广告数据。
 
-`.env` 可配置：
+在 `.env` 追加：
 
 ```env
 PUBLIC_BASE_URL=https://spapi.yourdomain.com
@@ -187,6 +193,20 @@ Amazon Developer Console 中配置：
 - Login URI：`https://spapi.yourdomain.com/api/auth/amazon/login`
 - Redirect URI：`https://spapi.yourdomain.com/api/auth/amazon/callback`
 
+本地检查配置是否完整：
+
+```powershell
+curl http://127.0.0.1:8000/api/auth/amazon/status
+```
+
+授权成功后查看已保存授权：
+
+```powershell
+curl http://127.0.0.1:8000/api/auth/amazon/authorizations
+```
+
+接口不会返回 refresh token 明文，也不会返回加密后的 refresh token。
+
 公网反向代理建议只放行：
 
 - `/api/auth/amazon/login`
@@ -195,6 +215,13 @@ Amazon Developer Console 中配置：
 - `/api/health`
 
 不建议公网暴露后台页面、导入接口、报告接口、设置接口或 `/docs`。
+
+V3 已知边界：
+
+- 已完成：Amazon OAuth state 校验、LWA authorization code 换 token、refresh token 加密保存。
+- 已完成：已使用/过期/不匹配的 state 会在换 token 和读取敏感配置前被拒绝。
+- 未完成：SP-API 签名请求、Reports API 拉取、Orders API 拉取、Inventory API 拉取、Ads API 授权。
+- 未完成：生产登录系统、密钥轮换、授权撤销检测、自动同步任务。
 
 ## 目录结构
 
@@ -206,7 +233,7 @@ backend/
     domain/              枚举
     models/              SQLAlchemy 模型
     schemas/             Pydantic schema
-    services/            导入、标准化、报告、LLM、设置服务
+    services/            导入、标准化、报告、LLM、设置、Amazon OAuth、安全服务
     web/                 服务端页面模板和 CSS
   migrations/            Alembic 迁移
   tests/                 自动化测试和样例文件
