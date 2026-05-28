@@ -719,7 +719,7 @@ git commit -m "feat: add amazon oauth token services"
 - Create: `backend/app/services/amazon/oauth.py`
 - Create: `backend/tests/test_amazon_oauth_service.py`
 
-- [ ] **Step 1: Write OAuth service tests**
+- [x] **Step 1: Write OAuth service tests**
 
 Create `backend/tests/test_amazon_oauth_service.py`:
 
@@ -927,7 +927,7 @@ def test_handle_callback_marks_session_failed_when_lwa_fails() -> None:
         assert oauth_session.status == "failed"
 ```
 
-- [ ] **Step 2: Run service tests to verify they fail**
+- [x] **Step 2: Run service tests to verify they fail**
 
 Run:
 
@@ -938,7 +938,7 @@ python -m pytest tests/test_amazon_oauth_service.py -q
 
 Expected: FAIL because `app.services.amazon.oauth` does not exist yet.
 
-- [ ] **Step 3: Implement OAuth service**
+- [x] **Step 3: Implement OAuth service**
 
 Create `backend/app/services/amazon/oauth.py`:
 
@@ -1125,7 +1125,7 @@ def handle_authorization_callback(
     )
 ```
 
-- [ ] **Step 4: Run OAuth service tests**
+- [x] **Step 4: Run OAuth service tests**
 
 Run:
 
@@ -1136,7 +1136,7 @@ python -m pytest tests/test_amazon_oauth_service.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 Run:
 
