@@ -16,6 +16,7 @@ def preview_manual_import(
     report_type: ReportType,
     date_range_start: date,
     date_range_end: date,
+    today: date | None = None,
 ) -> ImportPreviewResponse:
     parsed = parse_report_file(file_path)
     schema = detect_schema(report_type, parsed.headers)
@@ -31,5 +32,5 @@ def preview_manual_import(
         required_columns_present=not missing_columns,
         missing_columns=missing_columns,
         sample_rows=parsed.sample_rows,
-        data_status=classify_data_status(date_range_end),
+        data_status=classify_data_status(date_range_end, today=today),
     )

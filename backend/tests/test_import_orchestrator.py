@@ -13,6 +13,7 @@ def test_preview_manual_import_returns_schema_and_rows() -> None:
         report_type=ReportType.BUSINESS_REPORT,
         date_range_start=date(2026, 5, 25),
         date_range_end=date(2026, 5, 25),
+        today=date(2026, 5, 26),
     )
 
     assert preview.detected_schema_version == "business_report.v1"
