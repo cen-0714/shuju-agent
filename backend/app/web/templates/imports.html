@@ -2,10 +2,36 @@
 {% block content %}
 <h1>Data Import</h1>
 <form method="post" action="/api/imports/preview" enctype="multipart/form-data">
-  <label>Report type <input name="report_type" value="business_report"></label>
+  <fieldset>
+    <legend>Store</legend>
+    <label>Seller account <input name="seller_account_id" inputmode="numeric"></label>
+    <label>Marketplace <input name="marketplace_id" inputmode="numeric"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Report type</legend>
+    <select name="report_type">
+      <option value="business_report">Business Report</option>
+      <option value="inventory_report">Inventory Report</option>
+      <option value="ads_search_term_report">Ads Search Term Report</option>
+    </select>
+  </fieldset>
   <label>Start date <input name="date_range_start" type="date"></label>
   <label>End date <input name="date_range_end" type="date"></label>
   <label>File <input name="file" type="file"></label>
-  <button type="submit">Preview Import</button>
+  <div class="actions">
+    <button type="submit">Preview</button>
+    <button type="submit" formaction="/api/imports/confirm">Confirm Import</button>
+  </div>
 </form>
+<section>
+  <h2>Import History</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Store</th><th>Report type</th><th>Status</th><th>Delete</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5">No imports yet.</td></tr>
+    </tbody>
+  </table>
+</section>
 {% endblock %}

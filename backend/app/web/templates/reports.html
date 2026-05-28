@@ -1,5 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Report Center</h1>
-<p>Generated reports will appear here.</p>
+<form method="post" action="/api/reports/generate">
+  <fieldset>
+    <legend>Scope</legend>
+    <label><input type="radio" name="scope_type" value="all_stores" checked> All stores</label>
+    <label><input type="radio" name="scope_type" value="single_store"> Single store</label>
+    <label>Seller account <input name="seller_account_id" inputmode="numeric"></label>
+    <label>Marketplace <input name="marketplace_id" inputmode="numeric"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Report kind</legend>
+    <label><input type="radio" name="report_kind" value="single_day" checked> Single day</label>
+    <label><input type="radio" name="report_kind" value="date_range"> Date range</label>
+  </fieldset>
+  <label>Start date <input name="report_start_date" type="date"></label>
+  <label>End date <input name="report_end_date" type="date"></label>
+  <div class="actions">
+    <button type="submit">Generate Report</button>
+    <button type="button" class="secondary">Download Excel</button>
+  </div>
+</form>
+<section>
+  <h2>Generated Reports</h2>
+  <table>
+    <thead>
+      <tr><th>Date range</th><th>Scope</th><th>Status</th><th>Markdown</th><th>Excel</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5">No reports yet.</td></tr>
+    </tbody>
+  </table>
+</section>
 {% endblock %}

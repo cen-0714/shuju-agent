@@ -1,8 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Dashboard</h1>
+<section class="toolbar">
+  <button type="button">Generate Today</button>
+  <button type="button" class="secondary">Refresh</button>
+</section>
 <section>
-  <h2>Latest Daily Report</h2>
-  <p>No report has been generated in this environment.</p>
+  <h2>Recent Reports</h2>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Scope</th><th>Status</th><th>Excel</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="4">No reports yet.</td></tr>
+    </tbody>
+  </table>
+</section>
+<section>
+  <h2>Stale Reports</h2>
+  <table>
+    <thead>
+      <tr><th>Report</th><th>Reason</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="3">No stale reports.</td></tr>
+    </tbody>
+  </table>
+</section>
+<section>
+  <h2>Recent Imports</h2>
+  <table>
+    <thead>
+      <tr><th>Store</th><th>Report type</th><th>Status</th><th>Rows</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="4">No imports yet.</td></tr>
+    </tbody>
+  </table>
 </section>
 {% endblock %}
