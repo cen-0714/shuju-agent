@@ -58,6 +58,19 @@ class LLMStatus(StrEnum):
     FAILED = "failed"
 
 
+class AmazonOAuthSessionStatus(StrEnum):
+    CREATED = "created"
+    CONSUMED = "consumed"
+    EXPIRED = "expired"
+    FAILED = "failed"
+
+
+class AmazonAuthorizationStatus(StrEnum):
+    ACTIVE = "active"
+    FAILED = "failed"
+    REVOKED = "revoked"
+
+
 class UserRole(StrEnum):
     ADMIN = "admin"
     OPERATOR = "operator"
