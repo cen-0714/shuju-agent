@@ -95,7 +95,7 @@ Responsibilities:
 - Create: `backend/tests/test_amazon_oauth_models.py`
 - Create: `backend/migrations/versions/20260528_0003_amazon_oauth.py`
 
-- [ ] **Step 1: Write model and config tests**
+- [x] **Step 1: Write model and config tests**
 
 Create `backend/tests/test_amazon_oauth_models.py`:
 
@@ -164,7 +164,7 @@ def test_amazon_oauth_models_persist_session_and_authorization() -> None:
         assert authorization.refresh_token_encrypted == "encrypted-refresh-token"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -175,7 +175,7 @@ python -m pytest tests/test_amazon_oauth_models.py -q
 
 Expected: FAIL because `AmazonAuthorizationStatus`, `AmazonOAuthSessionStatus`, and `app.models.amazon` do not exist yet.
 
-- [ ] **Step 3: Add dependency and configuration**
+- [x] **Step 3: Add dependency and configuration**
 
 Modify `backend/pyproject.toml` dependencies:
 
@@ -226,7 +226,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 ```
 
-- [ ] **Step 4: Add enums**
+- [x] **Step 4: Add enums**
 
 Modify `backend/app/domain/enums.py`:
 
@@ -244,7 +244,7 @@ class AmazonAuthorizationStatus(StrEnum):
     REVOKED = "revoked"
 ```
 
-- [ ] **Step 5: Add models**
+- [x] **Step 5: Add models**
 
 Create `backend/app/models/amazon.py`:
 
@@ -297,7 +297,7 @@ from app.models.amazon import AmazonAuthorization, AmazonAuthorizationSession
 
 Add both names to `__all__`.
 
-- [ ] **Step 6: Add Alembic migration**
+- [x] **Step 6: Add Alembic migration**
 
 Create `backend/migrations/versions/20260528_0003_amazon_oauth.py`:
 
@@ -420,7 +420,7 @@ def downgrade() -> None:
     op.drop_table("amazon_authorization_sessions")
 ```
 
-- [ ] **Step 7: Run model tests**
+- [x] **Step 7: Run model tests**
 
 Run:
 
@@ -431,7 +431,7 @@ python -m pytest tests/test_amazon_oauth_models.py -q
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 1**
+- [x] **Step 8: Commit Task 1**
 
 Run:
 
@@ -450,7 +450,7 @@ git commit -m "feat: add amazon oauth persistence"
 - Create: `backend/tests/test_token_cipher.py`
 - Create: `backend/tests/test_amazon_lwa.py`
 
-- [ ] **Step 1: Write token encryption tests**
+- [x] **Step 1: Write token encryption tests**
 
 Create `backend/tests/test_token_cipher.py`:
 
@@ -481,7 +481,7 @@ def test_token_cipher_rejects_invalid_key() -> None:
         TokenCipher("not-a-fernet-key")
 ```
 
-- [ ] **Step 2: Run token tests to verify they fail**
+- [x] **Step 2: Run token tests to verify they fail**
 
 Run:
 
@@ -492,7 +492,7 @@ python -m pytest tests/test_token_cipher.py -q
 
 Expected: FAIL because `app.services.security.tokens` does not exist yet.
 
-- [ ] **Step 3: Implement token encryption**
+- [x] **Step 3: Implement token encryption**
 
 Create `backend/app/services/security/__init__.py`:
 
@@ -528,7 +528,7 @@ class TokenCipher:
             raise ValueError("encrypted token could not be decrypted") from exc
 ```
 
-- [ ] **Step 4: Write LWA client tests**
+- [x] **Step 4: Write LWA client tests**
 
 Create `backend/tests/test_amazon_lwa.py`:
 
@@ -608,7 +608,7 @@ def test_lwa_client_requires_refresh_token_in_response() -> None:
         )
 ```
 
-- [ ] **Step 5: Run LWA tests to verify they fail**
+- [x] **Step 5: Run LWA tests to verify they fail**
 
 Run:
 
@@ -619,7 +619,7 @@ python -m pytest tests/test_amazon_lwa.py -q
 
 Expected: FAIL because `app.services.amazon.lwa` does not exist yet.
 
-- [ ] **Step 6: Implement LWA client**
+- [x] **Step 6: Implement LWA client**
 
 Create `backend/app/services/amazon/__init__.py`:
 
@@ -693,7 +693,7 @@ class LWAClient:
         )
 ```
 
-- [ ] **Step 7: Run service tests**
+- [x] **Step 7: Run service tests**
 
 Run:
 
@@ -704,7 +704,7 @@ python -m pytest tests/test_token_cipher.py tests/test_amazon_lwa.py -q
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 2**
+- [x] **Step 8: Commit Task 2**
 
 Run:
 
