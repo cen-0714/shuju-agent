@@ -13,36 +13,22 @@ from app.schemas.amazon import (
     AmazonAuthorizationResponse,
     AmazonOAuthStatusResponse,
 )
-from app.services.amazon.lwa import LWAClient
 from app.services.amazon.oauth import (
     AmazonOAuthError,
+    LWAClientFactory,
     create_login_redirect,
+    create_lwa_client,
     get_oauth_status,
     handle_authorization_callback,
 )
-from app.services.security.tokens import TokenCipher, TokenCipherConfigError
 
 router = APIRouter(prefix="/auth/amazon", tags=["amazon-auth"])
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-def get_lwa_client(settings: SettingsDep) -> LWAClient:
-    if not settings.AMAZON_LWA_CLIENT_ID or not settings.AMAZON_LWA_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="Amazon LWA configuration is incomplete")
-    return LWAClient(
-        token_url=settings.AMAZON_LWA_TOKEN_URL,
-        client_id=settings.AMAZON_LWA_CLIENT_ID,
-        client_secret=settings.AMAZON_LWA_CLIENT_SECRET,
-        timeout_seconds=settings.AMAZON_LWA_TIMEOUT_SECONDS,
-    )
-
-
-def get_token_cipher(settings: SettingsDep) -> TokenCipher:
-    try:
-        return TokenCipher(settings.TOKEN_ENCRYPTION_KEY)
-    except TokenCipherConfigError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+def get_lwa_client_factory() -> LWAClientFactory:
+    return create_lwa_client
 
 
 @router.get("/status", response_model=AmazonOAuthStatusResponse)
@@ -76,8 +62,7 @@ def login(
 def callback(
     session: SessionDep,
     settings: SettingsDep,
-    lwa_client: Annotated[LWAClient, Depends(get_lwa_client)],
-    token_cipher: Annotated[TokenCipher, Depends(get_token_cipher)],
+    lwa_client_factory: Annotated[LWAClientFactory, Depends(get_lwa_client_factory)],
     state: Annotated[str, Query(min_length=1)],
     selling_partner_id: Annotated[str, Query(min_length=1)],
     spapi_oauth_code: Annotated[str, Query(min_length=1)],
@@ -89,8 +74,7 @@ def callback(
             state=state,
             selling_partner_id=selling_partner_id,
             spapi_oauth_code=spapi_oauth_code,
-            lwa_client=lwa_client,
-            token_cipher=token_cipher,
+            lwa_client_factory=lwa_client_factory,
         )
     except AmazonOAuthError as exc:
         session.commit()

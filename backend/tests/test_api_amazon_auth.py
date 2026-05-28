@@ -30,7 +30,14 @@ def make_settings() -> Settings:
     )
 
 
-def make_client() -> tuple[TestClient, sessionmaker[Session]]:
+def make_incomplete_settings() -> Settings:
+    return Settings(
+        DATABASE_URL="sqlite+pysqlite:///:memory:",
+        PUBLIC_BASE_URL="https://spapi.example.com",
+    )
+
+
+def make_client(settings_factory=make_settings) -> tuple[TestClient, sessionmaker[Session]]:
     engine = create_sync_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     session_factory = create_session_factory(engine)
@@ -41,7 +48,7 @@ def make_client() -> tuple[TestClient, sessionmaker[Session]]:
             yield session
 
     app.dependency_overrides[get_session] = override_session
-    app.dependency_overrides[get_settings] = make_settings
+    app.dependency_overrides[get_settings] = settings_factory
     return TestClient(app), session_factory
 
 
@@ -122,16 +129,20 @@ def test_callback_endpoint_saves_encrypted_authorization() -> None:
 
     from app.api.routes import amazon_auth
 
-    def override_lwa_client() -> LWAClient:
-        settings = make_settings()
-        return LWAClient(
-            token_url=settings.AMAZON_LWA_TOKEN_URL,
-            client_id=settings.AMAZON_LWA_CLIENT_ID or "",
-            client_secret=settings.AMAZON_LWA_CLIENT_SECRET or "",
-            transport=httpx.MockTransport(handler),
-        )
+    def override_lwa_client_factory():
+        def factory(settings: Settings) -> LWAClient:
+            return LWAClient(
+                token_url=settings.AMAZON_LWA_TOKEN_URL,
+                client_id=settings.AMAZON_LWA_CLIENT_ID or "",
+                client_secret=settings.AMAZON_LWA_CLIENT_SECRET or "",
+                transport=httpx.MockTransport(handler),
+            )
 
-    client.app.dependency_overrides[amazon_auth.get_lwa_client] = override_lwa_client
+        return factory
+
+    client.app.dependency_overrides[amazon_auth.get_lwa_client_factory] = (
+        override_lwa_client_factory
+    )
 
     response = client.get(
         "/api/auth/amazon/callback",
@@ -153,6 +164,23 @@ def test_callback_endpoint_saves_encrypted_authorization() -> None:
 
 def test_callback_endpoint_rejects_reused_state() -> None:
     client, session_factory = make_client()
+    seed_session(session_factory, status=AmazonOAuthSessionStatus.CONSUMED.value)
+
+    response = client.get(
+        "/api/auth/amazon/callback",
+        params={
+            "state": "local-state",
+            "selling_partner_id": "A3FHEXAMPLEYWS",
+            "spapi_oauth_code": "spapi-code",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "state has already been used"
+
+
+def test_callback_endpoint_validates_state_before_oauth_config() -> None:
+    client, session_factory = make_client(settings_factory=make_incomplete_settings)
     seed_session(session_factory, status=AmazonOAuthSessionStatus.CONSUMED.value)
 
     response = client.get(

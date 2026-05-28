@@ -1,4 +1,5 @@
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Protocol
@@ -12,13 +13,16 @@ from app.core.time import utc_now
 from app.domain.enums import AmazonAuthorizationStatus, AmazonOAuthSessionStatus
 from app.models.amazon import AmazonAuthorization, AmazonAuthorizationSession
 from app.models.settings import SellerAccount
-from app.services.amazon.lwa import LWATokenExchangeError, LWATokenResponse
+from app.services.amazon.lwa import LWAClient, LWATokenExchangeError, LWATokenResponse
 from app.services.security.tokens import TokenCipher, TokenCipherConfigError
 
 
 class LWAExchangeClient(Protocol):
     def exchange_authorization_code(self, *, code: str, redirect_uri: str) -> LWATokenResponse:
         pass
+
+
+LWAClientFactory = Callable[[Settings], LWAExchangeClient]
 
 
 @dataclass(frozen=True)
@@ -107,8 +111,9 @@ def handle_authorization_callback(
     state: str,
     selling_partner_id: str,
     spapi_oauth_code: str,
-    lwa_client: LWAExchangeClient,
-    token_cipher: TokenCipher,
+    lwa_client: LWAExchangeClient | None = None,
+    token_cipher: TokenCipher | None = None,
+    lwa_client_factory: LWAClientFactory | None = None,
 ) -> CallbackResult:
     oauth_session = session.scalar(
         select(AmazonAuthorizationSession).where(AmazonAuthorizationSession.state == state)
@@ -132,6 +137,15 @@ def handle_authorization_callback(
         or not settings.AMAZON_LWA_CLIENT_SECRET
     ):
         raise AmazonOAuthError("Amazon OAuth configuration is incomplete", status_code=500)
+
+    try:
+        token_cipher = token_cipher or TokenCipher(settings.TOKEN_ENCRYPTION_KEY)
+    except TokenCipherConfigError as exc:
+        raise AmazonOAuthError(str(exc), status_code=500) from exc
+
+    if lwa_client is None:
+        factory = lwa_client_factory or create_lwa_client
+        lwa_client = factory(settings)
 
     try:
         token_response = lwa_client.exchange_authorization_code(
@@ -190,3 +204,14 @@ def _is_expired(expires_at: datetime) -> bool:
     if expires_at.tzinfo is None:
         return expires_at < now.replace(tzinfo=None)
     return expires_at < now
+
+
+def create_lwa_client(settings: Settings) -> LWAClient:
+    if not settings.AMAZON_LWA_CLIENT_ID or not settings.AMAZON_LWA_CLIENT_SECRET:
+        raise AmazonOAuthError("Amazon OAuth configuration is incomplete", status_code=500)
+    return LWAClient(
+        token_url=settings.AMAZON_LWA_TOKEN_URL,
+        client_id=settings.AMAZON_LWA_CLIENT_ID,
+        client_secret=settings.AMAZON_LWA_CLIENT_SECRET,
+        timeout_seconds=settings.AMAZON_LWA_TIMEOUT_SECONDS,
+    )
