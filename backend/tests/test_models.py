@@ -9,7 +9,7 @@ def test_settings_defaults_to_local_storage() -> None:
     settings = Settings(DATABASE_URL="sqlite+pysqlite:///:memory:")
 
     assert settings.APP_ENV == "local"
-    assert settings.STORAGE_ROOT.endswith("backend/storage")
+    assert settings.STORAGE_ROOT == "storage"
 
 
 def test_domain_enums_have_required_values() -> None:

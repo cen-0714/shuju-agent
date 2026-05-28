@@ -30,9 +30,9 @@
 ```powershell
 @"
 DATABASE_URL=postgresql+psycopg://copilot:copilot@localhost:5432/copilot
-STORAGE_ROOT=backend/storage
+STORAGE_ROOT=storage
 LLM_PROVIDER=mock
-"@ | Set-Content -Encoding UTF8 .env
+"@ | Set-Content -Encoding UTF8 backend\.env
 
 cd backend
 python -m pip install -e ".[dev]"
@@ -151,7 +151,7 @@ Ads Search Term Report 必需列：
 
 ## LLM 配置
 
-`.env` 可配置：
+`backend\.env` 可配置：
 
 ```env
 LLM_PROVIDER=mock
@@ -167,7 +167,7 @@ LLM_TIMEOUT_SECONDS=30
 
 V3 只实现授权回调和 refresh token 加密保存，不会自动拉取订单、库存、报表或广告数据。
 
-在 `.env` 追加：
+在 `backend\.env` 追加：
 
 ```env
 PUBLIC_BASE_URL=https://spapi.yourdomain.com
@@ -245,7 +245,7 @@ docs/
 ## 数据和文件存储
 
 - 数据库默认使用本地 Docker Postgres：`postgresql+psycopg://copilot:copilot@localhost:5432/copilot`
-- 原始文件和报告文件默认保存到：`backend/storage`
+- 后端从 `backend` 目录启动，`STORAGE_ROOT=storage` 时原始文件和报告文件会保存到：`backend/storage`
 - `backend/storage` 已在 `.gitignore` 中，不会提交到 Git。
 
 ## 回滚
