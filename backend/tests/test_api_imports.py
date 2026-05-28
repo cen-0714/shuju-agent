@@ -1,8 +1,28 @@
+from collections.abc import Generator
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
+from sqlalchemy.orm import Session
 
+from app.api.deps import get_session
+from app.core.db import create_session_factory, create_sync_engine
 from app.main import create_app
+from app.models.base import Base
+
+
+def make_client() -> TestClient:
+    engine = create_sync_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session_factory = create_session_factory(engine)
+    app = create_app()
+
+    def override_session() -> Generator[Session, None, None]:
+        with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_session
+    return TestClient(app)
 
 
 def test_import_preview_endpoint_accepts_csv() -> None:
@@ -13,6 +33,8 @@ def test_import_preview_endpoint_accepts_csv() -> None:
         response = client.post(
             "/api/imports/preview",
             data={
+                "seller_account_id": "1",
+                "marketplace_id": "1",
                 "report_type": "business_report",
                 "date_range_start": "2026-05-25",
                 "date_range_end": "2026-05-25",
@@ -22,3 +44,45 @@ def test_import_preview_endpoint_accepts_csv() -> None:
 
     assert response.status_code == 200
     assert response.json()["detected_schema_version"] == "business_report.v1"
+
+
+def test_import_confirm_endpoint_persists_business_report(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("STORAGE_ROOT", str(tmp_path))
+    client = make_client()
+    fixture = Path(__file__).parent / "fixtures" / "business_report.csv"
+    seller = client.post(
+        "/api/settings/seller-accounts",
+        json={"display_name": "Store A", "amazon_seller_id": "SELLER-A"},
+    ).json()
+    marketplace = client.post(
+        "/api/settings/marketplaces",
+        json={
+            "seller_account_id": seller["id"],
+            "marketplace_id": "ATVPDKIKX0DER",
+            "region": "americas",
+            "country_code": "US",
+            "timezone": "America/Los_Angeles",
+            "currency_code": "USD",
+        },
+    ).json()
+
+    with fixture.open("rb") as file:
+        response = client.post(
+            "/api/imports/confirm",
+            data={
+                "seller_account_id": str(seller["id"]),
+                "marketplace_id": str(marketplace["id"]),
+                "report_type": "business_report",
+                "date_range_start": "2026-05-25",
+                "date_range_end": "2026-05-25",
+            },
+            files={"file": ("business_report.csv", file, "text/csv")},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "succeeded"
+    assert body["row_count"] == 1

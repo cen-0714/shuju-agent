@@ -22,6 +22,21 @@ class ImportPreviewResponse(BaseModel):
     data_status: DataStatus
 
 
+class ImportConfirmResponse(BaseModel):
+    import_job_id: int
+    raw_dataset_id: int
+    seller_account_id: int
+    marketplace_id: int
+    report_type: ReportType
+    status: str
+    original_filename: str
+    raw_file_path: str
+    raw_file_checksum: str
+    row_count: int
+    normalized_row_count: int
+    data_status: DataStatus
+
+
 class RawDatasetEnvelopeSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
