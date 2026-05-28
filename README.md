@@ -11,9 +11,10 @@
 - 报告生成：支持单店铺/全部店铺、单日/日期范围报告。
 - 报告下载：支持 Markdown 查看和 Excel 下载。
 - LLM 分析：支持 OpenAI-compatible 接口；没有 API Key 时自动跳过，不影响报告生成。
+- Amazon SP-API 授权：提供 Website OAuth Login URI / Redirect URI，支持保存加密 refresh token，供后续 API 拉取版本使用。
 - 页面入口：Dashboard、Data Import、Report Center、Settings 四个服务端页面。
 
-暂未实现：Amazon SP-API 自动拉取、Ads API 自动拉取、登录权限、异步任务队列、推送通知。
+暂未实现：Amazon SP-API 自动拉取数据、Ads API 自动拉取、SP-API 签名请求、限流轮询、登录权限、异步任务队列、推送通知。
 
 ## 环境要求
 
@@ -155,6 +156,45 @@ LLM_TIMEOUT_SECONDS=30
 ```
 
 国内多数 OpenAI-compatible 厂商可以通过替换 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 接入。没有 API Key 时，系统会跳过 LLM 分析，报告仍可生成。
+
+## Amazon SP-API OAuth 配置
+
+V3 只实现授权回调和 refresh token 加密保存，不会自动拉取订单、库存、报表或广告数据。
+
+`.env` 可配置：
+
+```env
+PUBLIC_BASE_URL=https://spapi.yourdomain.com
+AMAZON_LWA_CLIENT_ID=
+AMAZON_LWA_CLIENT_SECRET=
+AMAZON_LWA_TOKEN_URL=https://api.amazon.com/auth/o2/token
+AMAZON_OAUTH_LOGIN_PATH=/api/auth/amazon/login
+AMAZON_OAUTH_REDIRECT_PATH=/api/auth/amazon/callback
+AMAZON_OAUTH_STATE_TTL_MINUTES=10
+AMAZON_LWA_TIMEOUT_SECONDS=15
+TOKEN_ENCRYPTION_KEY=
+```
+
+生成 Fernet 加密 key：
+
+```powershell
+cd backend
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Amazon Developer Console 中配置：
+
+- Login URI：`https://spapi.yourdomain.com/api/auth/amazon/login`
+- Redirect URI：`https://spapi.yourdomain.com/api/auth/amazon/callback`
+
+公网反向代理建议只放行：
+
+- `/api/auth/amazon/login`
+- `/api/auth/amazon/callback`
+- `/api/auth/amazon/status`
+- `/api/health`
+
+不建议公网暴露后台页面、导入接口、报告接口、设置接口或 `/docs`。
 
 ## 目录结构
 
