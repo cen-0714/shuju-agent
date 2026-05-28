@@ -4,13 +4,16 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_session
 from app.core.config import Settings
 from app.core.storage import create_storage_backend
 from app.domain.enums import ReportType
-from app.schemas.imports import ImportConfirmResponse, ImportPreviewResponse
+from app.models.imports import ImportJob
+from app.schemas.imports import ImportConfirmResponse, ImportJobResponse, ImportPreviewResponse
+from app.services.imports.deletion import delete_import_job
 from app.services.imports.orchestrator import preview_manual_import
 from app.services.imports.persistence import confirm_manual_import
 
@@ -67,3 +70,28 @@ async def confirm_import(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     session.commit()
     return response
+
+
+@router.get("/jobs", response_model=list[ImportJobResponse])
+def list_import_jobs(session: SessionDep) -> list[ImportJob]:
+    return list(session.scalars(select(ImportJob).order_by(ImportJob.created_at.desc())))
+
+
+@router.get("/jobs/{import_job_id}", response_model=ImportJobResponse)
+def get_import_job(import_job_id: int, session: SessionDep) -> ImportJob:
+    import_job = session.get(ImportJob, import_job_id)
+    if import_job is None:
+        raise HTTPException(status_code=404, detail="import job not found")
+    return import_job
+
+
+@router.delete("/jobs/{import_job_id}", response_model=ImportJobResponse)
+def delete_import(import_job_id: int, session: SessionDep) -> ImportJob:
+    storage = create_storage_backend(Settings().STORAGE_ROOT)
+    try:
+        import_job = delete_import_job(session, storage, import_job_id)
+    except ValueError as exc:
+        session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    session.commit()
+    return import_job

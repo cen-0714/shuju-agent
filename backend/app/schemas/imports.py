@@ -37,6 +37,22 @@ class ImportConfirmResponse(BaseModel):
     data_status: DataStatus
 
 
+class ImportJobResponse(BaseModel):
+    id: int
+    seller_account_id: int
+    marketplace_id: int
+    report_type: str
+    date_range_start: date
+    date_range_end: date
+    status: str
+    original_filename: str | None
+    error_code: str | None
+    error_message: str | None
+    deleted_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RawDatasetEnvelopeSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
