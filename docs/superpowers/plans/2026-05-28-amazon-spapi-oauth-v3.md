@@ -1699,7 +1699,7 @@ git add README.md
 git commit -m "docs: document amazon oauth setup"
 ```
 
-- [ ] **Step 7: Push V3 branch**
+- [x] **Step 7: Push V3 branch**
 
 Run:
 
