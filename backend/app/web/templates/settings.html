@@ -1,38 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Settings</h1>
+
 <section>
-  <h2>Seller Accounts</h2>
-  <form method="post" action="/api/settings/seller-accounts">
-    <label>Display name <input name="display_name"></label>
-    <label>Amazon seller ID <input name="amazon_seller_id"></label>
-    <button type="submit">Save Seller Account</button>
+  <h2>店铺档案</h2>
+  <p>先保存店铺。Amazon 页面里的“卖家记号 / Merchant Token”就是这里的亚马逊卖家ID。</p>
+  <form id="seller-account-form">
+    <label>显示名称 <input name="display_name" placeholder="例如：美洲主店" required></label>
+    <label>卖家记号 / Merchant Token <input name="amazon_seller_id" required></label>
+    <button type="submit">保存店铺档案</button>
   </form>
+  <p id="seller-account-result" role="status"></p>
 </section>
+
 <section>
-  <h2>Marketplaces</h2>
-  <form method="post" action="/api/settings/marketplaces">
-    <label>Seller account <input name="seller_account_id" inputmode="numeric"></label>
-    <label>Marketplace ID <input name="marketplace_id"></label>
-    <label>Region <input name="region" value="americas"></label>
-    <label>Country code <input name="country_code" value="US"></label>
-    <label>Timezone <input name="timezone" value="America/Los_Angeles"></label>
-    <label>Currency code <input name="currency_code" value="USD"></label>
-    <button type="submit">Save Marketplace</button>
-  </form>
-</section>
-<section>
-  <h2>Amazon Self Authorization</h2>
+  <h2>SP-API 自授权</h2>
+  <p>卖方合作伙伴身份填同一个卖家记号。刷新令牌 Atzr 开头，由 Amazon 后台“授权应用”生成。</p>
   <form id="amazon-self-authorization-form">
-    <label>Selling partner ID <input name="selling_partner_id" required></label>
-    <label>Refresh token <input name="refresh_token" type="password" required></label>
-    <label>Token type <input name="token_type" value="bearer"></label>
-    <button type="submit">Save Amazon Authorization</button>
+    <label>卖方合作伙伴身份 <input name="selling_partner_id" required></label>
+    <label>刷新令牌 Atzr <input name="refresh_token" type="password" required></label>
+    <label>令牌类型 <input name="token_type" value="bearer"></label>
+    <button type="submit">保存 SP-API 授权</button>
   </form>
   <p id="amazon-self-authorization-result" role="status"></p>
 </section>
+
+<section>
+  <h2>可选：市场</h2>
+  <p>只测试 SP-API 授权可以先不填。后续做多站点报表时，再把店铺 ID 和市场绑定。</p>
+  <form id="marketplace-form">
+    <label>店铺 ID <input name="seller_account_id" inputmode="numeric"></label>
+    <label>市场ID <input name="marketplace_id" value="ATVPDKIKX0DER"></label>
+    <label>地区 <input name="region" value="americas"></label>
+    <label>国家代码 <input name="country_code" value="US"></label>
+    <label>时区 <input name="timezone" value="America/Los_Angeles"></label>
+    <label>币种 <input name="currency_code" value="USD"></label>
+    <button type="submit">保存市场</button>
+  </form>
+  <p id="marketplace-result" role="status"></p>
+</section>
+
 <section>
   <h2>LLM Settings</h2>
+  <p>这部分只影响报告分析，不影响 Amazon 授权。</p>
   <form>
     <label>Base URL <input name="llm_base_url" value="https://api.openai.com/v1"></label>
     <label>Model <input name="llm_model" value="gpt-4.1-mini"></label>
@@ -40,26 +50,56 @@
     <button type="button">Save LLM Settings</button>
   </form>
 </section>
-<script>
-  const amazonAuthorizationForm = document.querySelector("#amazon-self-authorization-form");
-  const amazonAuthorizationResult = document.querySelector("#amazon-self-authorization-result");
 
-  amazonAuthorizationForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(amazonAuthorizationForm);
-    const payload = Object.fromEntries(formData.entries());
-    const response = await fetch("/api/auth/amazon/self-authorizations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+<script>
+  const forms = [
+    {
+      selector: "#seller-account-form",
+      resultSelector: "#seller-account-result",
+      url: "/api/settings/seller-accounts",
+      successMessage: (payload) => `店铺已保存，店铺 ID：${payload.id}`,
+    },
+    {
+      selector: "#marketplace-form",
+      resultSelector: "#marketplace-result",
+      url: "/api/settings/marketplaces",
+      transform: (payload) => ({ ...payload, seller_account_id: Number(payload.seller_account_id) }),
+      successMessage: (payload) => `市场已保存，市场记录 ID：${payload.id}`,
+    },
+    {
+      selector: "#amazon-self-authorization-form",
+      resultSelector: "#amazon-self-authorization-result",
+      url: "/api/auth/amazon/self-authorizations",
+      successMessage: () => "SP-API 授权已保存。",
+      resetOnSuccess: true,
+    },
+  ];
+
+  const submitJsonForm = async ({ selector, resultSelector, url, transform, successMessage, resetOnSuccess }) => {
+    const form = document.querySelector(selector);
+    const result = document.querySelector(resultSelector);
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const basePayload = Object.fromEntries(formData.entries());
+      const payload = transform ? transform(basePayload) : basePayload;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const responsePayload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        if (resetOnSuccess) {
+          form.reset();
+        }
+        result.textContent = successMessage(responsePayload);
+        return;
+      }
+      result.textContent = responsePayload.detail ?? "保存失败，请检查填写内容。";
     });
-    if (response.ok) {
-      amazonAuthorizationForm.reset();
-      amazonAuthorizationResult.textContent = "Amazon authorization saved.";
-      return;
-    }
-    const error = await response.json().catch(() => ({ detail: "Save failed." }));
-    amazonAuthorizationResult.textContent = error.detail ?? "Save failed.";
-  });
+  };
+
+  forms.forEach(submitJsonForm);
 </script>
 {% endblock %}
