@@ -100,4 +100,7 @@ def _validate_authorization_config(settings: Settings) -> None:
     if not settings.TOKEN_ENCRYPTION_KEY:
         missing.append("TOKEN_ENCRYPTION_KEY")
     if missing:
-        raise AmazonAuthorizationConfigError(f"Missing Amazon authorization config: {', '.join(missing)}")
+        missing_config = ", ".join(missing)
+        raise AmazonAuthorizationConfigError(
+            f"Missing Amazon authorization config: {missing_config}"
+        )

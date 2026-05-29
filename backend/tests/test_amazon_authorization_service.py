@@ -145,5 +145,8 @@ def test_delete_authorization_raises_for_missing_record() -> None:
     session_factory = make_session_factory()
 
     with session_factory() as session:
-        with pytest.raises(AmazonAuthorizationNotFoundError, match="Amazon authorization not found"):
+        with pytest.raises(
+            AmazonAuthorizationNotFoundError,
+            match="Amazon authorization not found",
+        ):
             delete_authorization(session, 404)
