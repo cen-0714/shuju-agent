@@ -64,6 +64,30 @@ class AmazonAuthorizationStatus(StrEnum):
     REVOKED = "revoked"
 
 
+class SPAPISyncJobStatus(StrEnum):
+    DRAFT = "draft"
+    REQUESTED = "requested"
+    PROCESSING = "processing"
+    DOWNLOAD_READY = "download_ready"
+    DOWNLOADED = "downloaded"
+    IMPORTED = "imported"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class SPAPISyncJobErrorCode(StrEnum):
+    MISSING_AUTHORIZATION = "missing_authorization"
+    LWA_TOKEN_FAILED = "lwa_token_failed"
+    PERMISSION_DENIED = "permission_denied"
+    RATE_LIMITED = "rate_limited"
+    AMAZON_REPORT_FAILED = "amazon_report_failed"
+    DOWNLOAD_FAILED = "download_failed"
+    PARSE_FAILED = "parse_failed"
+    NORMALIZE_FAILED = "normalize_failed"
+    DUPLICATE_DATASET = "duplicate_dataset"
+    UNEXPECTED_ERROR = "unexpected_error"
+
+
 class UserRole(StrEnum):
     ADMIN = "admin"
     OPERATOR = "operator"
