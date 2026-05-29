@@ -1,7 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,17 +8,16 @@ from app.api.deps import get_session, get_settings
 from app.core.config import Settings
 from app.models.amazon import AmazonAuthorization
 from app.schemas.amazon import (
-    AmazonAuthorizationCallbackResponse,
     AmazonAuthorizationResponse,
-    AmazonOAuthStatusResponse,
+    AmazonAuthorizationStatusResponse,
+    AmazonSelfAuthorizationCreate,
 )
-from app.services.amazon.oauth import (
-    AmazonOAuthError,
-    LWAClientFactory,
-    create_login_redirect,
-    create_lwa_client,
-    get_oauth_status,
-    handle_authorization_callback,
+from app.services.amazon.authorization import (
+    AmazonAuthorizationConfigError,
+    AmazonAuthorizationNotFoundError,
+    delete_authorization,
+    get_authorization_status,
+    save_self_authorization,
 )
 
 router = APIRouter(prefix="/auth/amazon", tags=["amazon-auth"])
@@ -27,62 +25,43 @@ SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-def get_lwa_client_factory() -> LWAClientFactory:
-    return create_lwa_client
+@router.get("/status", response_model=AmazonAuthorizationStatusResponse)
+def status(settings: SettingsDep) -> AmazonAuthorizationStatusResponse:
+    return AmazonAuthorizationStatusResponse.model_validate(
+        get_authorization_status(settings).__dict__
+    )
 
 
-@router.get("/status", response_model=AmazonOAuthStatusResponse)
-def status(settings: SettingsDep) -> AmazonOAuthStatusResponse:
-    return AmazonOAuthStatusResponse.model_validate(get_oauth_status(settings).__dict__)
-
-
-@router.get("/login")
-def login(
+@router.post("/self-authorizations", response_model=AmazonAuthorizationResponse)
+def post_self_authorization(
+    payload: AmazonSelfAuthorizationCreate,
     session: SessionDep,
     settings: SettingsDep,
-    amazon_callback_uri: Annotated[str, Query(min_length=1)],
-    amazon_state: Annotated[str, Query(min_length=1)],
-    selling_partner_id: Annotated[str, Query(min_length=1)],
-) -> RedirectResponse:
+) -> AmazonAuthorization:
     try:
-        result = create_login_redirect(
+        authorization = save_self_authorization(
             session=session,
             settings=settings,
-            amazon_callback_uri=amazon_callback_uri,
-            amazon_state=amazon_state,
-            selling_partner_id=selling_partner_id,
+            selling_partner_id=payload.selling_partner_id,
+            refresh_token=payload.refresh_token,
+            token_type=payload.token_type,
         )
-    except AmazonOAuthError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except AmazonAuthorizationConfigError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     session.commit()
-    return RedirectResponse(result.redirect_url, status_code=307)
-
-
-@router.get("/callback", response_model=AmazonAuthorizationCallbackResponse)
-def callback(
-    session: SessionDep,
-    settings: SettingsDep,
-    lwa_client_factory: Annotated[LWAClientFactory, Depends(get_lwa_client_factory)],
-    state: Annotated[str, Query(min_length=1)],
-    selling_partner_id: Annotated[str, Query(min_length=1)],
-    spapi_oauth_code: Annotated[str, Query(min_length=1)],
-) -> AmazonAuthorizationCallbackResponse:
-    try:
-        result = handle_authorization_callback(
-            session=session,
-            settings=settings,
-            state=state,
-            selling_partner_id=selling_partner_id,
-            spapi_oauth_code=spapi_oauth_code,
-            lwa_client_factory=lwa_client_factory,
-        )
-    except AmazonOAuthError as exc:
-        session.commit()
-        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
-    session.commit()
-    return AmazonAuthorizationCallbackResponse(**result.__dict__)
+    return authorization
 
 
 @router.get("/authorizations", response_model=list[AmazonAuthorizationResponse])
 def authorizations(session: SessionDep) -> list[AmazonAuthorization]:
     return list(session.scalars(select(AmazonAuthorization).order_by(AmazonAuthorization.id)))
+
+
+@router.delete("/authorizations/{authorization_id}", status_code=204)
+def delete_authorization_endpoint(authorization_id: int, session: SessionDep) -> Response:
+    try:
+        delete_authorization(session, authorization_id)
+    except AmazonAuthorizationNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    session.commit()
+    return Response(status_code=204)

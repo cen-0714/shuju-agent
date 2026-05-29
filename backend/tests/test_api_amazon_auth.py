@@ -1,7 +1,5 @@
 from collections.abc import Generator
-from datetime import timedelta
 
-import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -9,12 +7,10 @@ from app.api.deps import get_session, get_settings
 from app.core.config import Settings
 from app.core.db import create_session_factory, create_sync_engine
 from app.core.time import utc_now
-from app.domain.enums import AmazonOAuthSessionStatus
 from app.main import create_app
-from app.models.amazon import AmazonAuthorization, AmazonAuthorizationSession
+from app.models.amazon import AmazonAuthorization
 from app.models.base import Base
 from app.models.settings import Organization, SellerAccount
-from app.services.amazon.lwa import LWAClient
 from app.services.security.tokens import TokenCipher
 
 TEST_KEY = "MDEyMzQ1Njc4OUFCQ0RFRjAxMjM0NTY3ODlBQkNERUY="
@@ -23,7 +19,6 @@ TEST_KEY = "MDEyMzQ1Njc4OUFCQ0RFRjAxMjM0NTY3ODlBQkNERUY="
 def make_settings() -> Settings:
     return Settings(
         DATABASE_URL="sqlite+pysqlite:///:memory:",
-        PUBLIC_BASE_URL="https://spapi.example.com",
         AMAZON_LWA_CLIENT_ID="client-id",
         AMAZON_LWA_CLIENT_SECRET="client-secret",
         TOKEN_ENCRYPTION_KEY=TEST_KEY,
@@ -31,10 +26,7 @@ def make_settings() -> Settings:
 
 
 def make_incomplete_settings() -> Settings:
-    return Settings(
-        DATABASE_URL="sqlite+pysqlite:///:memory:",
-        PUBLIC_BASE_URL="https://spapi.example.com",
-    )
+    return Settings(DATABASE_URL="sqlite+pysqlite:///:memory:")
 
 
 def make_client(settings_factory=make_settings) -> tuple[TestClient, sessionmaker[Session]]:
@@ -52,165 +44,81 @@ def make_client(settings_factory=make_settings) -> tuple[TestClient, sessionmake
     return TestClient(app), session_factory
 
 
-def seed_session(
-    session_factory: sessionmaker[Session],
-    *,
-    state: str = "local-state",
-    selling_partner_id: str = "A3FHEXAMPLEYWS",
-    status: str = AmazonOAuthSessionStatus.CREATED.value,
-    expires_delta: timedelta = timedelta(minutes=10),
-) -> None:
-    with session_factory() as session:
-        session.add(
-            AmazonAuthorizationSession(
-                state=state,
-                amazon_state="amazon-state",
-                amazon_callback_uri="https://sellercentral.amazon.com/apps/authorize/confirm",
-                selling_partner_id=selling_partner_id,
-                status=status,
-                expires_at=utc_now() + expires_delta,
-            )
-        )
-        session.commit()
-
-
-def test_status_endpoint_returns_uris_without_secrets() -> None:
+def test_status_endpoint_returns_internal_config_flags_without_secrets() -> None:
     client, _session_factory = make_client()
 
     response = client.get("/api/auth/amazon/status")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["login_uri"] == "https://spapi.example.com/api/auth/amazon/login"
-    assert payload["redirect_uri"] == "https://spapi.example.com/api/auth/amazon/callback"
-    assert payload["lwa_client_secret_configured"] is True
+    assert payload == {
+        "lwa_client_id_configured": True,
+        "lwa_client_secret_configured": True,
+        "token_encryption_key_configured": True,
+    }
     assert "client-secret" not in response.text
     assert "TOKEN_ENCRYPTION_KEY" not in response.text
+    assert "login_uri" not in payload
+    assert "redirect_uri" not in payload
 
 
-def test_login_endpoint_creates_state_and_redirects() -> None:
+def test_website_oauth_routes_are_removed() -> None:
+    client, _session_factory = make_client()
+
+    assert client.get("/api/auth/amazon/login").status_code == 404
+    assert client.get("/api/auth/amazon/callback").status_code == 404
+
+
+def test_self_authorization_endpoint_saves_encrypted_authorization() -> None:
     client, session_factory = make_client()
-
-    response = client.get(
-        "/api/auth/amazon/login",
-        params={
-            "amazon_callback_uri": "https://sellercentral.amazon.com/apps/authorize/confirm",
-            "amazon_state": "amazon-state",
-            "selling_partner_id": "A3FHEXAMPLEYWS",
-        },
-        follow_redirects=False,
-    )
-
-    assert response.status_code == 307
-    assert response.headers["location"].startswith(
-        "https://sellercentral.amazon.com/apps/authorize/confirm?"
-    )
-    assert "amazon_state=amazon-state" in response.headers["location"]
     with session_factory() as session:
-        saved = session.query(AmazonAuthorizationSession).one()
-        assert f"state={saved.state}" in response.headers["location"]
-        assert saved.selling_partner_id == "A3FHEXAMPLEYWS"
-
-
-def test_callback_endpoint_saves_encrypted_authorization() -> None:
-    client, session_factory = make_client()
-    seed_session(session_factory)
-
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "refresh_token": "refresh-token",
-                "access_token": "access-token",
-                "token_type": "bearer",
-                "expires_in": 3600,
-            },
+        org = Organization(name="Internal Team", slug="internal")
+        seller = SellerAccount(
+            organization=org,
+            display_name="US Store",
+            amazon_seller_id="A3FHEXAMPLEYWS",
         )
+        session.add(seller)
+        session.commit()
 
-    from app.api.routes import amazon_auth
-
-    def override_lwa_client_factory():
-        def factory(settings: Settings) -> LWAClient:
-            return LWAClient(
-                token_url=settings.AMAZON_LWA_TOKEN_URL,
-                client_id=settings.AMAZON_LWA_CLIENT_ID or "",
-                client_secret=settings.AMAZON_LWA_CLIENT_SECRET or "",
-                transport=httpx.MockTransport(handler),
-            )
-
-        return factory
-
-    client.app.dependency_overrides[amazon_auth.get_lwa_client_factory] = (
-        override_lwa_client_factory
-    )
-
-    response = client.get(
-        "/api/auth/amazon/callback",
-        params={
-            "state": "local-state",
+    response = client.post(
+        "/api/auth/amazon/self-authorizations",
+        json={
             "selling_partner_id": "A3FHEXAMPLEYWS",
-            "spapi_oauth_code": "spapi-code",
+            "refresh_token": "refresh-token",
+            "token_type": "bearer",
         },
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == "active"
+    payload = response.json()
+    assert payload["selling_partner_id"] == "A3FHEXAMPLEYWS"
+    assert payload["status"] == "active"
+    assert "refresh-token" not in response.text
+    assert "refresh_token_encrypted" not in response.text
+
     cipher = TokenCipher(TEST_KEY)
     with session_factory() as session:
         authorization = session.query(AmazonAuthorization).one()
+        assert authorization.seller_account_id == seller.id
         assert authorization.refresh_token_encrypted != "refresh-token"
         assert cipher.decrypt(authorization.refresh_token_encrypted) == "refresh-token"
 
 
-def test_callback_endpoint_rejects_reused_state() -> None:
-    client, session_factory = make_client()
-    seed_session(session_factory, status=AmazonOAuthSessionStatus.CONSUMED.value)
+def test_self_authorization_endpoint_returns_500_when_config_missing() -> None:
+    client, _session_factory = make_client(settings_factory=make_incomplete_settings)
 
-    response = client.get(
-        "/api/auth/amazon/callback",
-        params={
-            "state": "local-state",
+    response = client.post(
+        "/api/auth/amazon/self-authorizations",
+        json={
             "selling_partner_id": "A3FHEXAMPLEYWS",
-            "spapi_oauth_code": "spapi-code",
+            "refresh_token": "refresh-token",
+            "token_type": "bearer",
         },
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "state has already been used"
-
-
-def test_callback_endpoint_validates_state_before_oauth_config() -> None:
-    client, session_factory = make_client(settings_factory=make_incomplete_settings)
-    seed_session(session_factory, status=AmazonOAuthSessionStatus.CONSUMED.value)
-
-    response = client.get(
-        "/api/auth/amazon/callback",
-        params={
-            "state": "local-state",
-            "selling_partner_id": "A3FHEXAMPLEYWS",
-            "spapi_oauth_code": "spapi-code",
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "state has already been used"
-
-
-def test_callback_endpoint_rejects_expired_state() -> None:
-    client, session_factory = make_client()
-    seed_session(session_factory, expires_delta=timedelta(minutes=-1))
-
-    response = client.get(
-        "/api/auth/amazon/callback",
-        params={
-            "state": "local-state",
-            "selling_partner_id": "A3FHEXAMPLEYWS",
-            "spapi_oauth_code": "spapi-code",
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "state expired"
+    assert response.status_code == 500
+    assert "Missing Amazon authorization config" in response.json()["detail"]
 
 
 def test_authorizations_endpoint_does_not_return_refresh_token() -> None:
@@ -241,3 +149,35 @@ def test_authorizations_endpoint_does_not_return_refresh_token() -> None:
     assert response.json()[0]["selling_partner_id"] == "A3FHEXAMPLEYWS"
     assert "refresh_token" not in response.text
     assert "encrypted-refresh-token" not in response.text
+
+
+def test_delete_authorization_endpoint_removes_record() -> None:
+    client, session_factory = make_client()
+    with session_factory() as session:
+        authorization = AmazonAuthorization(
+            selling_partner_id="A3FHEXAMPLEYWS",
+            lwa_client_id="client-id",
+            refresh_token_encrypted="encrypted-refresh-token",
+            token_type="bearer",
+            authorized_at=utc_now(),
+            status="active",
+        )
+        session.add(authorization)
+        session.commit()
+        authorization_id = authorization.id
+
+    response = client.delete(f"/api/auth/amazon/authorizations/{authorization_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    with session_factory() as session:
+        assert session.get(AmazonAuthorization, authorization_id) is None
+
+
+def test_delete_authorization_endpoint_returns_404_for_missing_record() -> None:
+    client, _session_factory = make_client()
+
+    response = client.delete("/api/auth/amazon/authorizations/404")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Amazon authorization not found"
