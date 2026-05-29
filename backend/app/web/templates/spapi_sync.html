@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>SP-API Sync</h1>
+<section>
+  <h2>创建同步任务</h2>
+  <form id="spapi-sync-form">
+    <label>店铺/市场 <select name="store_option" id="store-option"></select></label>
+    <label>报表类型 <select name="internal_report_type" id="report-type"></select></label>
+    <label>开始日期 <input name="date_range_start" type="date" required></label>
+    <label>结束日期 <input name="date_range_end" type="date" required></label>
+    <div class="actions">
+      <button type="submit">创建并运行同步</button>
+      <button type="button" id="refresh-jobs" class="secondary">刷新任务</button>
+    </div>
+    <p id="sync-message" role="status"></p>
+  </form>
+</section>
+<section>
+  <h2>同步任务</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>报表</th>
+        <th>日期</th>
+        <th>状态</th>
+        <th>Amazon Report ID</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="sync-jobs"><tr><td colspan="6">No sync jobs yet.</td></tr></tbody>
+  </table>
+</section>
+<script>
+async function jsonFetch(url, options = {}) {
+  const response = await fetch(url, {
+    headers: {"Content-Type": "application/json"},
+    ...options,
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || response.statusText);
+  }
+  return response.json();
+}
+async function loadOptions() {
+  const stores = await jsonFetch("/api/settings/store-options");
+  document.getElementById("store-option").innerHTML = stores.map((item) =>
+    `<option value="${item.seller_account_id}:${item.marketplace_id}">${item.label}</option>`
+  ).join("");
+  const reportTypes = await jsonFetch("/api/spapi/report-types");
+  document.getElementById("report-type").innerHTML = reportTypes.map((item) =>
+    `<option value="${item.internal_report_type}">${item.display_name}</option>`
+  ).join("");
+}
+async function loadJobs() {
+  const jobs = await jsonFetch("/api/spapi/sync-jobs");
+  document.getElementById("sync-jobs").innerHTML = jobs.length ? jobs.map((job) =>
+    `<tr>
+      <td>${job.id}</td>
+      <td>${job.internal_report_type}</td>
+      <td>${job.date_range_start} - ${job.date_range_end}</td>
+      <td>${job.status}</td>
+      <td>${job.amazon_report_id || ""}</td>
+      <td><button type="button" data-refresh="${job.id}">刷新状态</button></td>
+    </tr>`
+  ).join("") : `<tr><td colspan="6">No sync jobs yet.</td></tr>`;
+}
+document.getElementById("spapi-sync-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.target);
+  const [seller_account_id, marketplace_id] = form.get("store_option").split(":").map(Number);
+  const job = await jsonFetch("/api/spapi/sync-jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      seller_account_id,
+      marketplace_id,
+      internal_report_type: form.get("internal_report_type"),
+      date_range_start: form.get("date_range_start"),
+      date_range_end: form.get("date_range_end"),
+      report_options: {},
+    }),
+  });
+  await jsonFetch(`/api/spapi/sync-jobs/${job.id}/run`, {method: "POST"});
+  document.getElementById("sync-message").textContent = "同步任务已创建。稍后点击刷新状态。";
+  await loadJobs();
+});
+document.getElementById("sync-jobs").addEventListener("click", async (event) => {
+  const id = event.target.dataset.refresh;
+  if (id) {
+    await jsonFetch(`/api/spapi/sync-jobs/${id}/refresh`, {method: "POST"});
+    await loadJobs();
+  }
+});
+document.getElementById("refresh-jobs").addEventListener("click", loadJobs);
+loadOptions().then(loadJobs);
+</script>
+{% endblock %}

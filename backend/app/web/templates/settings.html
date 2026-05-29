@@ -14,9 +14,20 @@
 </section>
 
 <section>
+  <h2>已保存店铺</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>显示名称</th><th>卖家记号</th><th>状态</th></tr>
+    </thead>
+    <tbody id="seller-accounts"><tr><td colspan="4">No seller accounts yet.</td></tr></tbody>
+  </table>
+</section>
+
+<section>
   <h2>SP-API 自授权</h2>
   <p>卖方合作伙伴身份填同一个卖家记号。刷新令牌 Atzr 开头，由 Amazon 后台“授权应用”生成。</p>
   <form id="amazon-self-authorization-form">
+    <label>选择店铺 <select id="authorization-seller-account" name="seller_account_choice"></select></label>
     <label>卖方合作伙伴身份 <input name="selling_partner_id" required></label>
     <label>刷新令牌 Atzr <input name="refresh_token" type="password" required></label>
     <label>令牌类型 <input name="token_type" value="bearer"></label>
@@ -26,10 +37,20 @@
 </section>
 
 <section>
+  <h2>已保存 SP-API 授权</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>卖方伙伴身份</th><th>绑定店铺</th><th>状态</th></tr>
+    </thead>
+    <tbody id="amazon-authorizations"><tr><td colspan="4">No authorizations yet.</td></tr></tbody>
+  </table>
+</section>
+
+<section>
   <h2>可选：市场</h2>
   <p>只测试 SP-API 授权可以先不填。后续做多站点报表时，再把店铺 ID 和市场绑定。</p>
   <form id="marketplace-form">
-    <label>店铺 ID <input name="seller_account_id" inputmode="numeric"></label>
+    <label>店铺 <select name="seller_account_id" id="marketplace-seller-account"></select></label>
     <label>市场ID <input name="marketplace_id" value="ATVPDKIKX0DER"></label>
     <label>地区 <input name="region" value="americas"></label>
     <label>国家代码 <input name="country_code" value="US"></label>
@@ -52,12 +73,54 @@
 </section>
 
 <script>
+  let savedSellers = [];
+
+  const renderSellerOptions = () => {
+    const options = savedSellers.map((item) =>
+      `<option value="${item.id}" data-seller-id="${item.amazon_seller_id}">${item.display_name} - ${item.amazon_seller_id}</option>`
+    ).join("");
+    const authorizationSelect = document.getElementById("authorization-seller-account");
+    const marketplaceSelect = document.getElementById("marketplace-seller-account");
+    if (authorizationSelect) authorizationSelect.innerHTML = options;
+    if (marketplaceSelect) marketplaceSelect.innerHTML = options;
+    fillAuthorizationSellingPartnerId();
+  };
+
+  async function loadSellerAccounts() {
+    const response = await fetch("/api/settings/seller-accounts");
+    savedSellers = await response.json();
+    document.getElementById("seller-accounts").innerHTML = savedSellers.length
+      ? savedSellers.map((item) =>
+        `<tr><td>${item.id}</td><td>${item.display_name}</td><td>${item.amazon_seller_id}</td><td>${item.is_active}</td></tr>`
+      ).join("")
+      : `<tr><td colspan="4">No seller accounts yet.</td></tr>`;
+    renderSellerOptions();
+  }
+
+  async function loadAmazonAuthorizations() {
+    const response = await fetch("/api/auth/amazon/authorizations");
+    const authorizations = await response.json();
+    document.getElementById("amazon-authorizations").innerHTML = authorizations.length
+      ? authorizations.map((item) =>
+        `<tr><td>${item.id}</td><td>${item.selling_partner_id}</td><td>${item.seller_account_id || ""}</td><td>${item.status}</td></tr>`
+      ).join("")
+      : `<tr><td colspan="4">No authorizations yet.</td></tr>`;
+  }
+
+  function fillAuthorizationSellingPartnerId() {
+    const select = document.getElementById("authorization-seller-account");
+    const selected = select?.selectedOptions[0];
+    const input = document.querySelector('#amazon-self-authorization-form [name="selling_partner_id"]');
+    if (selected && input) input.value = selected.dataset.sellerId || "";
+  }
+
   const forms = [
     {
       selector: "#seller-account-form",
       resultSelector: "#seller-account-result",
       url: "/api/settings/seller-accounts",
       successMessage: (payload) => `店铺已保存，店铺 ID：${payload.id}`,
+      afterSuccess: loadSellerAccounts,
     },
     {
       selector: "#marketplace-form",
@@ -70,12 +133,29 @@
       selector: "#amazon-self-authorization-form",
       resultSelector: "#amazon-self-authorization-result",
       url: "/api/auth/amazon/self-authorizations",
+      transform: (payload) => ({
+        selling_partner_id: payload.selling_partner_id,
+        refresh_token: payload.refresh_token,
+        token_type: payload.token_type || "bearer",
+      }),
       successMessage: () => "SP-API 授权已保存。",
       resetOnSuccess: true,
+      afterSuccess: async () => {
+        await loadAmazonAuthorizations();
+        fillAuthorizationSellingPartnerId();
+      },
     },
   ];
 
-  const submitJsonForm = async ({ selector, resultSelector, url, transform, successMessage, resetOnSuccess }) => {
+  const submitJsonForm = async ({
+    selector,
+    resultSelector,
+    url,
+    transform,
+    successMessage,
+    resetOnSuccess,
+    afterSuccess,
+  }) => {
     const form = document.querySelector(selector);
     const result = document.querySelector(resultSelector);
     form?.addEventListener("submit", async (event) => {
@@ -94,12 +174,17 @@
           form.reset();
         }
         result.textContent = successMessage(responsePayload);
+        if (afterSuccess) await afterSuccess(responsePayload);
         return;
       }
       result.textContent = responsePayload.detail ?? "保存失败，请检查填写内容。";
     });
   };
 
+  document
+    .getElementById("authorization-seller-account")
+    ?.addEventListener("change", fillAuthorizationSellingPartnerId);
   forms.forEach(submitJsonForm);
+  loadSellerAccounts().then(loadAmazonAuthorizations);
 </script>
 {% endblock %}

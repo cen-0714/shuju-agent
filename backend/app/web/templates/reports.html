@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Report Center</h1>
-<form method="post" action="/api/reports/generate">
+<form id="report-generate-form">
   <fieldset>
     <legend>Scope</legend>
     <label><input type="radio" name="scope_type" value="all_stores" checked> All stores</label>
     <label><input type="radio" name="scope_type" value="single_store"> Single store</label>
-    <label>Seller account <input name="seller_account_id" inputmode="numeric"></label>
-    <label>Marketplace <input name="marketplace_id" inputmode="numeric"></label>
+    <label>店铺/市场 <select name="store_option" id="store-option"></select></label>
+    <input type="hidden" name="seller_account_id" id="seller-account-id">
+    <input type="hidden" name="marketplace_id" id="marketplace-id">
   </fieldset>
   <fieldset>
     <legend>Report kind</legend>
@@ -20,6 +21,7 @@
     <button type="submit">Generate Report</button>
     <button type="button" class="secondary">Download Excel</button>
   </div>
+  <p id="report-message" role="status"></p>
 </form>
 <section>
   <h2>Generated Reports</h2>
@@ -32,4 +34,47 @@
     </tbody>
   </table>
 </section>
+<script>
+async function loadStoreOptions() {
+  const response = await fetch("/api/settings/store-options");
+  const stores = await response.json();
+  const select = document.getElementById("store-option");
+  select.innerHTML = stores.map((item) =>
+    `<option value="${item.seller_account_id}:${item.marketplace_id}">${item.label}</option>`
+  ).join("");
+  syncStoreHiddenFields();
+}
+function syncStoreHiddenFields() {
+  const value = document.getElementById("store-option").value;
+  if (!value) return;
+  const [sellerAccountId, marketplaceId] = value.split(":");
+  document.getElementById("seller-account-id").value = sellerAccountId;
+  document.getElementById("marketplace-id").value = marketplaceId;
+}
+document.getElementById("store-option").addEventListener("change", syncStoreHiddenFields);
+document.getElementById("report-generate-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  syncStoreHiddenFields();
+  const form = new FormData(event.target);
+  const scopeType = form.get("scope_type");
+  const payload = {
+    scope_type: scopeType,
+    report_kind: form.get("report_kind"),
+    report_start_date: form.get("report_start_date"),
+    report_end_date: form.get("report_end_date"),
+    seller_account_id: scopeType === "single_store" ? Number(form.get("seller_account_id")) : null,
+    marketplace_id: scopeType === "single_store" ? Number(form.get("marketplace_id")) : null,
+  };
+  const response = await fetch("/api/reports/generate", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+  document.getElementById("report-message").textContent = response.ok
+    ? `报告已生成：#${result.id}`
+    : (result.detail || "报告生成失败");
+});
+loadStoreOptions();
+</script>
 {% endblock %}

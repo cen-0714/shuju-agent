@@ -4,8 +4,9 @@
 <form method="post" action="/api/imports/preview" enctype="multipart/form-data">
   <fieldset>
     <legend>Store</legend>
-    <label>Seller account <input name="seller_account_id" inputmode="numeric"></label>
-    <label>Marketplace <input name="marketplace_id" inputmode="numeric"></label>
+    <label>店铺/市场 <select name="store_option" id="store-option"></select></label>
+    <input type="hidden" name="seller_account_id" id="seller-account-id">
+    <input type="hidden" name="marketplace_id" id="marketplace-id">
   </fieldset>
   <fieldset>
     <legend>Report type</legend>
@@ -34,4 +35,25 @@
     </tbody>
   </table>
 </section>
+<script>
+async function loadStoreOptions() {
+  const response = await fetch("/api/settings/store-options");
+  const stores = await response.json();
+  const select = document.getElementById("store-option");
+  select.innerHTML = stores.map((item) =>
+    `<option value="${item.seller_account_id}:${item.marketplace_id}">${item.label}</option>`
+  ).join("");
+  syncStoreHiddenFields();
+}
+function syncStoreHiddenFields() {
+  const value = document.getElementById("store-option").value;
+  if (!value) return;
+  const [sellerAccountId, marketplaceId] = value.split(":");
+  document.getElementById("seller-account-id").value = sellerAccountId;
+  document.getElementById("marketplace-id").value = marketplaceId;
+}
+document.getElementById("store-option").addEventListener("change", syncStoreHiddenFields);
+document.querySelector("form").addEventListener("submit", syncStoreHiddenFields);
+loadStoreOptions();
+</script>
 {% endblock %}
