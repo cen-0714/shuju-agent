@@ -1,6 +1,6 @@
 # Amazon Daily Copilot
 
-内部使用的 Amazon 多店铺日常运营数据分析工具。当前版本面向手动导出文件导入、数据落库、报告生成，以及 Amazon SP-API 授权接入前的业务闭环验证。
+内部使用的 Amazon 多店铺日常运营数据分析工具。当前版本支持手动导出文件导入、SP-API 手动同步、数据落库、AI 分析报告和 Excel 输出。
 
 ## 当前功能
 
@@ -9,12 +9,13 @@
 - 数据持久化：保存原始文件、原始行、标准化后的业务/库存/广告搜索词数据。
 - 导入删除：删除导入会移除原始文件和相关明细数据，并把受影响报告标记为 `stale`。
 - 报告生成：支持单店铺/全部店铺、单日/日期范围报告。
-- 报告下载：支持 Markdown 查看和 Excel 下载。
-- LLM 分析：支持 OpenAI-compatible 接口；没有 API Key 时自动跳过，不影响报告生成。
-- Amazon SP-API 自授权：支持录入 Amazon 后台生成的 refresh token，并加密保存，供后续 API 拉取版本使用。
-- 页面入口：Dashboard、Data Import、Report Center、Settings 四个服务端页面。
+- 报告下载：支持 Markdown 查看和 Excel 下载，Excel 包含 AI Insights、Action Checklist、Data Warnings、Sync Jobs。
+- LLM 分析：支持 OpenAI-compatible 接口；Prompt 按版本文件管理，输出按 JSON schema 校验。
+- Amazon SP-API 自授权：支持录入 Amazon 后台生成的 refresh token，并加密保存。
+- SP-API 同步：支持手动创建并运行 `GET_SALES_AND_TRAFFIC_REPORT` 同步任务，下载后进入 RawDataset 和标准化管线。
+- 页面入口：Dashboard、Data Import、SP-API Sync、Report Center、Settings 五个服务端页面。
 
-暂未实现：Amazon SP-API 自动拉取数据、Ads API 自动拉取、SP-API 签名请求、限流轮询、登录权限、异步任务队列、推送通知。
+暂未实现：自动定时同步、后台异步任务队列、Ads API 自动拉取、登录权限、推送通知、买家 PII 数据、Amazon 写操作。
 
 ## 环境要求
 
@@ -108,16 +109,32 @@ python -m ruff check .
 4. 确认导入报表：
    `POST /api/imports/confirm`
 
-5. 生成报告：
+5. 查看可同步的 SP-API 报表类型：
+   `GET /api/spapi/report-types`
+
+6. 创建 SP-API 同步任务：
+   `POST /api/spapi/sync-jobs`
+
+7. 运行并刷新同步任务：
+   `POST /api/spapi/sync-jobs/{sync_job_id}/run`
+   `POST /api/spapi/sync-jobs/{sync_job_id}/refresh`
+
+8. 生成报告：
    `POST /api/reports/generate`
 
-6. 查看报告列表：
+9. 查看报告列表：
    `GET /api/reports`
 
-7. 下载报告：
+10. 下载报告：
    `GET /api/reports/{report_id}/excel`
 
-页面 `/imports`、`/reports`、`/settings` 已提供基础入口和控件；后续版本可以继续补前端交互，把页面操作完整串起来。
+页面流程：
+
+```text
+Settings -> 创建店铺 -> 保存 SP-API 自授权 -> 创建市场
+-> SP-API Sync -> 创建/运行同步任务 -> 刷新状态
+-> Report Center -> 生成报告 -> 下载 Excel
+```
 
 ## 支持的导入文件
 
@@ -163,9 +180,17 @@ LLM_TIMEOUT_SECONDS=30
 
 国内多数 OpenAI-compatible 厂商可以通过替换 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 接入。没有 API Key 时，系统会跳过 LLM 分析，报告仍可生成。
 
-## Amazon SP-API 自授权配置
+## Amazon SP-API 自授权与同步
 
-V4 使用内部自授权流程，不做 SaaS，不做外部卖家点击授权。当前版本只保存 Amazon 后台生成的 refresh token，不会自动拉取订单、库存、报表或广告数据。
+系统使用内部自授权流程，不做 SaaS，不做外部卖家点击授权。Amazon 后台生成的 refresh token 会加密保存。V5 使用该 refresh token 换取 LWA access token，并手动触发 Reports API 同步。
+
+当前 V5 只开放：
+
+```text
+business_sales_traffic -> GET_SALES_AND_TRAFFIC_REPORT
+```
+
+Listing、库存、财务、FBA 报表仍处于 disabled 状态，等对应 parser 和清洗规则明确后再开放。
 
 在 `backend\.env` 追加：
 
@@ -206,13 +231,21 @@ Invoke-RestMethod http://127.0.0.1:8000/api/auth/amazon/status
 Invoke-RestMethod http://127.0.0.1:8000/api/auth/amazon/authorizations
 ```
 
+查看 V5 已开放的 SP-API 报表类型：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/spapi/report-types
+```
+
 接口不会返回 refresh token 明文，也不会返回加密后的 refresh token。不要使用真实 token 写入 README、Git、聊天或截图。真实 token 泄露后，应在 Amazon 后台重新生成并撤销旧授权。
 
-V4 已知边界：
+V5 已知边界：
 
 - 已完成：内部 refresh token 录入、Fernet 加密保存、授权列表安全返回、授权删除。
-- 未完成：SP-API 签名请求、Reports API 拉取、Orders API 拉取、Inventory API 拉取、Ads API 授权。
-- 未完成：生产登录系统、密钥轮换、授权撤销检测、自动同步任务。
+- 已完成：手动 SP-API 同步任务、Reports API 创建/轮询/下载、Sales and Traffic 报表入库。
+- 已完成：LLM Prompt 版本化、结构化输出校验、AI Insights Excel 输出。
+- 未完成：自动定时同步、后台队列、Ads API、Orders API、买家 PII、Amazon 写操作。
+- 未完成：生产登录系统、密钥轮换、Amazon 侧授权撤销检测。
 
 ## 目录结构
 
