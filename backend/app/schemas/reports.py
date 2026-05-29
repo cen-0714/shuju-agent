@@ -1,7 +1,8 @@
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import ReportKind, ReportScopeType
 
@@ -23,6 +24,8 @@ class DailyReportDocument(BaseModel):
     store_summaries: list[StoreDailySummary]
     totals: dict[str, Decimal]
     warnings: list[str]
+    llm_analysis: dict[str, Any] | None = None
+    sync_sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class GenerateReportRequest(BaseModel):

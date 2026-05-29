@@ -8,12 +8,16 @@ from uuid import uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.core.storage import LocalStorageBackend
 from app.domain.enums import LLMStatus, ReportKind, ReportScopeType, ReportStatus
 from app.models.normalized import NormalizedBusinessDaily
 from app.models.reports import DailyReport
 from app.models.settings import Marketplace, SellerAccount
 from app.schemas.reports import GenerateReportRequest, StoreDailySummary
+from app.services.llm.openai_compatible import OpenAICompatibleLLMProvider
+from app.services.llm.provider import MockLLMProvider
+from app.services.llm.snapshot import build_llm_snapshot
 from app.services.reports.builder import build_daily_report
 from app.services.reports.excel import write_daily_report_excel
 from app.services.reports.markdown import render_daily_report_markdown
@@ -47,6 +51,27 @@ def generate_report(
         store_summaries=summaries,
         warnings=[],
     )
+    settings = Settings()
+    snapshot = build_llm_snapshot(document)
+    if settings.LLM_PROVIDER == "mock":
+        llm_output = MockLLMProvider().analyze(snapshot)
+        llm_status = LLMStatus.SUCCEEDED.value
+        llm_error = None
+        model_name = "mock"
+    else:
+        llm_result = OpenAICompatibleLLMProvider(
+            base_url=settings.LLM_BASE_URL,
+            api_key=settings.LLM_API_KEY,
+            model=settings.LLM_MODEL,
+            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
+        ).analyze(snapshot)
+        llm_output = llm_result.output
+        llm_status = llm_result.status
+        llm_error = llm_result.error
+        model_name = settings.LLM_MODEL
+    document.llm_analysis = llm_output
+    document.sync_sources = _build_sync_sources(rows)
+
     markdown = render_daily_report_markdown(document)
     report_token = uuid4().hex
     markdown_path = f"reports/markdown/{report_token}.md"
@@ -75,13 +100,14 @@ def generate_report(
         status=ReportStatus.ACTIVE.value,
         data_version=_data_version(rows),
         metric_definition_version="v1",
-        prompt_version="v1",
-        model_name="deterministic",
+        prompt_version="daily_report_v1",
+        model_name=model_name,
         report_json=json.dumps(document.model_dump(mode="json"), ensure_ascii=False),
         markdown=markdown,
         markdown_path=markdown_path,
         excel_path=excel_path,
-        llm_status=LLMStatus.SKIPPED.value,
+        llm_status=llm_status,
+        llm_error=llm_error,
     )
     session.add(report)
     session.flush()
@@ -178,3 +204,18 @@ def _data_version(rows: list[NormalizedBusinessDaily]) -> str:
     source = "|".join(sorted({row.raw_dataset.data_version for row in rows}))
     digest = sha256(source.encode("utf-8")).hexdigest()[:16]
     return f"v2:{digest}"
+
+
+def _build_sync_sources(rows: list[NormalizedBusinessDaily]) -> list[dict[str, object]]:
+    seen: dict[int, dict[str, object]] = {}
+    for row in rows:
+        dataset = row.raw_dataset
+        seen[dataset.id] = {
+            "raw_dataset_id": dataset.id,
+            "source": dataset.source,
+            "report_type": dataset.report_type,
+            "raw_file_path": dataset.raw_file_path,
+            "raw_file_checksum": dataset.raw_file_checksum,
+            "data_status": dataset.data_status,
+        }
+    return list(seen.values())

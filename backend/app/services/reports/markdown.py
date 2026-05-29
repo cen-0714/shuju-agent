@@ -18,6 +18,11 @@ def render_daily_report_markdown(report: DailyReportDocument) -> str:
             f"- {store.seller_name}: sales {store.ordered_product_sales}, "
             f"units {store.units_ordered}, ACOS {store.acos}"
         )
+    analysis = report.llm_analysis or {}
+    if isinstance(analysis, dict) and analysis.get("summary"):
+        lines.extend(["", "## AI Insights", f"- {analysis['summary']}"])
+        for finding in analysis.get("findings", []):
+            lines.append(f"- {finding.get('severity', 'info')}: {finding.get('title', '')}")
     lines.extend(["", "## Data Freshness"])
     if report.warnings:
         lines.extend([f"- {warning}" for warning in report.warnings])
