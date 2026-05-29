@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     AMAZON_LWA_CLIENT_SECRET: str | None = None
     AMAZON_LWA_TOKEN_URL: str = "https://api.amazon.com/auth/o2/token"
     AMAZON_LWA_TIMEOUT_SECONDS: int = 15
+    AMAZON_SPAPI_BASE_URL: str = "https://sellingpartnerapi-na.amazon.com"
+    AMAZON_REPORTS_TIMEOUT_SECONDS: int = 30
     TOKEN_ENCRYPTION_KEY: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

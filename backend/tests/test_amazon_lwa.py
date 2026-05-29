@@ -74,3 +74,32 @@ def test_lwa_client_requires_refresh_token_in_response() -> None:
             code="spapi-code",
             redirect_uri="https://spapi.example.com/api/auth/amazon/callback",
         )
+
+
+def test_lwa_client_exchanges_refresh_token_for_access_token() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = request.read().decode("utf-8")
+        assert request.url == "https://api.amazon.com/auth/o2/token"
+        assert "grant_type=refresh_token" in body
+        assert "refresh_token=Atzr%7Cexample" in body
+        return httpx.Response(
+            200,
+            json={
+                "access_token": "access-token",
+                "token_type": "bearer",
+                "expires_in": 3600,
+            },
+        )
+
+    client = LWAClient(
+        token_url="https://api.amazon.com/auth/o2/token",
+        client_id="client-id",
+        client_secret="client-secret",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = client.exchange_refresh_token(refresh_token="Atzr|example")
+
+    assert result.access_token == "access-token"
+    assert result.token_type == "bearer"
+    assert result.expires_in == 3600
