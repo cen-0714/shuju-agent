@@ -10,20 +10,6 @@ if TYPE_CHECKING:
     from app.models.settings import SellerAccount
 
 
-class AmazonAuthorizationSession(TimestampMixin, Base):
-    __tablename__ = "amazon_authorization_sessions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    state: Mapped[str] = mapped_column(String(160), unique=True, index=True)
-    amazon_state: Mapped[str] = mapped_column(String(500))
-    amazon_callback_uri: Mapped[str] = mapped_column(Text)
-    selling_partner_id: Mapped[str] = mapped_column(String(120), index=True)
-    status: Mapped[str] = mapped_column(String(40), index=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-
 class AmazonAuthorization(TimestampMixin, Base):
     __tablename__ = "amazon_authorizations"
 

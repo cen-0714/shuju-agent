@@ -1,4 +1,4 @@
-from app.models.amazon import AmazonAuthorization, AmazonAuthorizationSession
+from app.models.amazon import AmazonAuthorization
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.imports import ImportJob, RawDataset, RawReportRow
@@ -14,7 +14,6 @@ from app.models.settings import Marketplace, Organization, SellerAccount
 __all__ = [
     "AuditLog",
     "AmazonAuthorization",
-    "AmazonAuthorizationSession",
     "Base",
     "DailyMetric",
     "DailyReport",
