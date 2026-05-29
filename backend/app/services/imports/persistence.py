@@ -29,6 +29,33 @@ def confirm_manual_import(
     original_filename: str,
     file_bytes: bytes,
 ) -> ImportConfirmResponse:
+    return persist_imported_report(
+        session=session,
+        storage=storage,
+        seller_account_id=seller_account_id,
+        marketplace_id=marketplace_id,
+        source=DataSource.MANUAL_FILE,
+        report_type=report_type,
+        date_range_start=date_range_start,
+        date_range_end=date_range_end,
+        original_filename=original_filename,
+        file_bytes=file_bytes,
+    )
+
+
+def persist_imported_report(
+    *,
+    session: Session,
+    storage: LocalStorageBackend,
+    seller_account_id: int,
+    marketplace_id: int,
+    source: DataSource,
+    report_type: ReportType,
+    date_range_start: date,
+    date_range_end: date,
+    original_filename: str,
+    file_bytes: bytes,
+) -> ImportConfirmResponse:
     _ensure_store_exists(session, seller_account_id, marketplace_id)
     stored_file = storage.save_upload(
         category="raw",
@@ -55,7 +82,7 @@ def confirm_manual_import(
     job = ImportJob(
         seller_account_id=seller_account_id,
         marketplace_id=marketplace_id,
-        source=DataSource.MANUAL_FILE.value,
+        source=source.value,
         report_type=report_type.value,
         date_range_start=date_range_start,
         date_range_end=date_range_end,
@@ -66,7 +93,7 @@ def confirm_manual_import(
         import_job=job,
         seller_account_id=seller_account_id,
         marketplace_id=marketplace_id,
-        source=DataSource.MANUAL_FILE.value,
+        source=source.value,
         report_type=report_type.value,
         date_range_start=date_range_start,
         date_range_end=date_range_end,
@@ -75,7 +102,10 @@ def confirm_manual_import(
         raw_file_checksum=stored_file.checksum,
         row_count=parsed.row_count,
         data_status=data_status.value,
-        data_version=f"{report_type.value}:{date_range_end.isoformat()}:{stored_file.checksum[:12]}",
+        data_version=(
+            f"{source.value}:{report_type.value}:"
+            f"{date_range_end.isoformat()}:{stored_file.checksum[:12]}"
+        ),
     )
     session.add(dataset)
     session.flush()

@@ -1,0 +1,36 @@
+{
+  "reportSpecification": {
+    "reportType": "GET_SALES_AND_TRAFFIC_REPORT",
+    "marketplaceIds": ["ATVPDKIKX0DER"]
+  },
+  "salesAndTrafficByAsin": [
+    {
+      "parentAsin": "B0PARENT",
+      "childAsin": "B0TESTASIN",
+      "sku": "SKU-1",
+      "salesByAsin": {
+        "orderedProductSales": {"amount": 125.50, "currencyCode": "USD"},
+        "unitsOrdered": 5
+      },
+      "trafficByAsin": {
+        "sessions": 80,
+        "pageViews": 120,
+        "buyBoxPercentage": 95.0
+      }
+    }
+  ],
+  "salesAndTrafficByDate": [
+    {
+      "date": "2026-05-20",
+      "salesByDate": {
+        "orderedProductSales": {"amount": 125.50, "currencyCode": "USD"},
+        "unitsOrdered": 5
+      },
+      "trafficByDate": {
+        "sessions": 80,
+        "pageViews": 120,
+        "buyBoxPercentage": 95.0
+      }
+    }
+  ]
+}
