@@ -11,7 +11,7 @@
 - 报告生成：支持单店铺/全部店铺、单日/日期范围报告。
 - 报告下载：支持 Markdown 查看和 Excel 下载。
 - LLM 分析：支持 OpenAI-compatible 接口；没有 API Key 时自动跳过，不影响报告生成。
-- Amazon SP-API 授权：提供 Website OAuth Login URI / Redirect URI，支持保存加密 refresh token，供后续 API 拉取版本使用。
+- Amazon SP-API 自授权：支持录入 Amazon 后台生成的 refresh token，并加密保存，供后续 API 拉取版本使用。
 - 页面入口：Dashboard、Data Import、Report Center、Settings 四个服务端页面。
 
 暂未实现：Amazon SP-API 自动拉取数据、Ads API 自动拉取、SP-API 签名请求、限流轮询、登录权限、异步任务队列、推送通知。
@@ -48,7 +48,7 @@ python -m uvicorn app.main:app --reload --port 8000
 - 页面入口：http://127.0.0.1:8000/
 - API 文档：http://127.0.0.1:8000/docs
 - 健康检查：http://127.0.0.1:8000/api/health
-- Amazon OAuth 配置状态：http://127.0.0.1:8000/api/auth/amazon/status
+- Amazon SP-API 自授权配置状态：http://127.0.0.1:8000/api/auth/amazon/status
 
 ## 常用命令
 
@@ -163,20 +163,16 @@ LLM_TIMEOUT_SECONDS=30
 
 国内多数 OpenAI-compatible 厂商可以通过替换 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 接入。没有 API Key 时，系统会跳过 LLM 分析，报告仍可生成。
 
-## Amazon SP-API OAuth 配置
+## Amazon SP-API 自授权配置
 
-V3 只实现授权回调和 refresh token 加密保存，不会自动拉取订单、库存、报表或广告数据。
+V4 使用内部自授权流程，不做 SaaS，不做外部卖家点击授权。当前版本只保存 Amazon 后台生成的 refresh token，不会自动拉取订单、库存、报表或广告数据。
 
 在 `backend\.env` 追加：
 
 ```env
-PUBLIC_BASE_URL=https://spapi.yourdomain.com
 AMAZON_LWA_CLIENT_ID=
 AMAZON_LWA_CLIENT_SECRET=
 AMAZON_LWA_TOKEN_URL=https://api.amazon.com/auth/o2/token
-AMAZON_OAUTH_LOGIN_PATH=/api/auth/amazon/login
-AMAZON_OAUTH_REDIRECT_PATH=/api/auth/amazon/callback
-AMAZON_OAUTH_STATE_TTL_MINUTES=10
 AMAZON_LWA_TIMEOUT_SECONDS=15
 TOKEN_ENCRYPTION_KEY=
 ```
@@ -188,38 +184,33 @@ cd backend
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Amazon Developer Console 中配置：
+在 Amazon 后台点击“授权应用”生成 refresh token，然后在 Settings 页面保存授权，或使用接口保存：
 
-- Login URI：`https://spapi.yourdomain.com/api/auth/amazon/login`
-- Redirect URI：`https://spapi.yourdomain.com/api/auth/amazon/callback`
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://127.0.0.1:8000/api/auth/amazon/self-authorizations `
+  -ContentType "application/json" `
+  -Body '{"selling_partner_id":"A3FHEXAMPLEYWS","refresh_token":"Atzr|example","token_type":"bearer"}'
+```
 
 本地检查配置是否完整：
 
 ```powershell
-curl http://127.0.0.1:8000/api/auth/amazon/status
+Invoke-RestMethod http://127.0.0.1:8000/api/auth/amazon/status
 ```
 
-授权成功后查看已保存授权：
+查看已保存授权：
 
 ```powershell
-curl http://127.0.0.1:8000/api/auth/amazon/authorizations
+Invoke-RestMethod http://127.0.0.1:8000/api/auth/amazon/authorizations
 ```
 
-接口不会返回 refresh token 明文，也不会返回加密后的 refresh token。
+接口不会返回 refresh token 明文，也不会返回加密后的 refresh token。不要使用真实 token 写入 README、Git、聊天或截图。真实 token 泄露后，应在 Amazon 后台重新生成并撤销旧授权。
 
-公网反向代理建议只放行：
+V4 已知边界：
 
-- `/api/auth/amazon/login`
-- `/api/auth/amazon/callback`
-- `/api/auth/amazon/status`
-- `/api/health`
-
-不建议公网暴露后台页面、导入接口、报告接口、设置接口或 `/docs`。
-
-V3 已知边界：
-
-- 已完成：Amazon OAuth state 校验、LWA authorization code 换 token、refresh token 加密保存。
-- 已完成：已使用/过期/不匹配的 state 会在换 token 和读取敏感配置前被拒绝。
+- 已完成：内部 refresh token 录入、Fernet 加密保存、授权列表安全返回、授权删除。
 - 未完成：SP-API 签名请求、Reports API 拉取、Orders API 拉取、Inventory API 拉取、Ads API 授权。
 - 未完成：生产登录系统、密钥轮换、授权撤销检测、自动同步任务。
 
@@ -233,7 +224,7 @@ backend/
     domain/              枚举
     models/              SQLAlchemy 模型
     schemas/             Pydantic schema
-    services/            导入、标准化、报告、LLM、设置、Amazon OAuth、安全服务
+    services/            导入、标准化、报告、LLM、设置、Amazon 自授权、安全服务
     web/                 服务端页面模板和 CSS
   migrations/            Alembic 迁移
   tests/                 自动化测试和样例文件

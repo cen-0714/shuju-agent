@@ -10,7 +10,13 @@ def test_v2_pages_show_operational_controls() -> None:
         "/": ["Recent Reports", "Stale Reports", "Recent Imports"],
         "/imports": ["Store", "Report type", "Preview", "Confirm Import", "Import History"],
         "/reports": ["All stores", "Single store", "Generate Report", "Download Excel"],
-        "/settings": ["Seller Accounts", "Marketplaces", "LLM Settings"],
+        "/settings": [
+            "Seller Accounts",
+            "Marketplaces",
+            "Amazon Self Authorization",
+            "Refresh token",
+            "LLM Settings",
+        ],
     }
     for path, expected_text in pages.items():
         response = client.get(path)
