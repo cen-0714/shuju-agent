@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.domain.enums import LLMStatus
+from app.services.llm.prompt_registry import load_prompt
 from app.services.llm.validator import validate_llm_output
 
 
@@ -35,6 +36,8 @@ class OpenAICompatibleLLMProvider:
             return LLMAnalysisResult(status=LLMStatus.SKIPPED.value, output=None, error=None)
 
         try:
+            prompt = load_prompt("daily_report_v1")
+            snapshot_json = json.dumps(snapshot, ensure_ascii=False)
             with httpx.Client(
                 timeout=self.timeout_seconds,
                 transport=self.transport,
@@ -47,14 +50,14 @@ class OpenAICompatibleLLMProvider:
                         "messages": [
                             {
                                 "role": "system",
-                                "content": (
-                                    "Return JSON with summary and findings. "
-                                    "All recommendations must require human review."
-                                ),
+                                "content": prompt.system_prompt,
                             },
                             {
                                 "role": "user",
-                                "content": json.dumps(snapshot, ensure_ascii=False),
+                                "content": prompt.user_prompt.replace(
+                                    "{{ snapshot_json }}",
+                                    snapshot_json,
+                                ),
                             },
                         ],
                         "response_format": {"type": "json_object"},

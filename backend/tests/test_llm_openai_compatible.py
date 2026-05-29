@@ -25,14 +25,14 @@ def test_openai_compatible_provider_parses_response() -> None:
         "findings": [
             {
                 "title": "Review sales",
+                "severity": "info",
                 "evidence_refs": ["report:2026-05-25"],
-                "possible_causes": ["Normal demand"],
+                "reasoning": "Normal demand in the normalized report.",
                 "recommended_human_actions": ["Review store summary"],
-                "risk_level": "low",
-                "confidence": "medium",
                 "human_review_required": True,
             }
         ],
+        "data_quality_notes": [],
     }
 
     def handler(request: httpx.Request) -> httpx.Response:

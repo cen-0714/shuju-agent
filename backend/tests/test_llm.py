@@ -35,14 +35,14 @@ def test_validator_rejects_automatic_operation_recommendation() -> None:
         "findings": [
             {
                 "title": "Auto change bid",
+                "severity": "critical",
                 "evidence_refs": ["report:2026-05-25"],
-                "possible_causes": ["High ACOS"],
+                "reasoning": "High ACOS.",
                 "recommended_human_actions": ["Automatically change bid to 0.5"],
-                "risk_level": "high",
-                "confidence": "medium",
                 "human_review_required": True,
             }
         ],
+        "data_quality_notes": [],
     }
 
     try:
