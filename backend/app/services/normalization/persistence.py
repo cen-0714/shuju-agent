@@ -6,10 +6,12 @@ from app.models.normalized import (
     NormalizedAdsSearchTermDaily,
     NormalizedBusinessDaily,
     NormalizedInventoryDaily,
+    NormalizedOrderDaily,
 )
 from app.services.normalization.ads import normalize_ads_search_term_row
 from app.services.normalization.business import normalize_business_row
 from app.services.normalization.inventory import normalize_inventory_row
+from app.services.normalization.orders import normalize_order_rows
 
 
 def persist_normalized_rows(
@@ -18,6 +20,8 @@ def persist_normalized_rows(
     rows: list[dict[str, str]],
 ) -> int:
     if dataset.report_type != ReportType.BUSINESS_REPORT.value:
+        if dataset.report_type == ReportType.ORDERS_REPORT.value:
+            return _persist_order_rows(session, dataset, rows)
         if dataset.report_type == ReportType.INVENTORY_REPORT.value:
             return _persist_inventory_rows(session, dataset, rows)
         if dataset.report_type == ReportType.ADS_SEARCH_TERM_REPORT.value:
@@ -41,6 +45,32 @@ def persist_normalized_rows(
                 page_views=normalized.page_views,
                 conversion_rate=normalized.conversion_rate,
                 buy_box_percentage=normalized.buy_box_percentage,
+            )
+        )
+        count += 1
+    return count
+
+
+def _persist_order_rows(
+    session: Session,
+    dataset: RawDataset,
+    rows: list[dict[str, str]],
+) -> int:
+    count = 0
+    for normalized in normalize_order_rows(rows):
+        session.add(
+            NormalizedOrderDaily(
+                raw_dataset=dataset,
+                seller_account_id=dataset.seller_account_id,
+                marketplace_id=dataset.marketplace_id,
+                report_date=normalized.report_date,
+                sku=normalized.sku,
+                asin=normalized.asin,
+                product_name=normalized.product_name,
+                currency=normalized.currency,
+                units_ordered=normalized.units_ordered,
+                ordered_product_sales=normalized.ordered_product_sales,
+                order_count=normalized.order_count,
             )
         )
         count += 1

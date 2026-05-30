@@ -11,6 +11,11 @@
     <input type="hidden" name="marketplace_id" id="marketplace-id">
   </fieldset>
   <fieldset>
+    <legend>Data source</legend>
+    <label><input type="radio" name="data_source" value="orders" checked> 订单 (Orders)</label>
+    <label><input type="radio" name="data_source" value="business"> 销售流量 (Sales &amp; Traffic)</label>
+  </fieldset>
+  <fieldset>
     <legend>Report kind</legend>
     <label><input type="radio" name="report_kind" value="single_day" checked> Single day</label>
     <label><input type="radio" name="report_kind" value="date_range"> Date range</label>
@@ -60,6 +65,7 @@ document.getElementById("report-generate-form").addEventListener("submit", async
   const payload = {
     scope_type: scopeType,
     report_kind: form.get("report_kind"),
+    data_source: form.get("data_source"),
     report_start_date: form.get("report_start_date"),
     report_end_date: form.get("report_end_date"),
     seller_account_id: scopeType === "single_store" ? Number(form.get("seller_account_id")) : null,

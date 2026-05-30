@@ -1,3 +1,4 @@
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -65,11 +66,16 @@ def get_report_excel(report_id: int, session: SessionDep) -> FileResponse:
 @router.post("/{report_id}/regenerate", response_model=DailyReportResponse)
 def regenerate_report(report_id: int, session: SessionDep) -> DailyReport:
     existing = _get_report_or_404(session, report_id)
+    try:
+        stored_document = json.loads(existing.report_json)
+    except (ValueError, TypeError):
+        stored_document = {}
     payload = GenerateReportRequest(
         scope_type=existing.scope_type,
         report_kind=existing.report_kind,
         report_start_date=existing.report_start_date,
         report_end_date=existing.report_end_date,
+        data_source=stored_document.get("data_source", "business"),
         seller_account_id=existing.seller_account_id,
         marketplace_id=existing.marketplace_id,
     )

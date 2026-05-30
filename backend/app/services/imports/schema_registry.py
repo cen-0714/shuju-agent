@@ -31,6 +31,32 @@ SCHEMAS: dict[ReportType, list[ReportSchema]] = {
             },
         )
     ],
+    ReportType.ORDERS_REPORT: [
+        ReportSchema(
+            version="orders.v1",
+            report_type=ReportType.ORDERS_REPORT,
+            required_columns={
+                "amazon-order-id",
+                "purchase-date",
+                "sku",
+                "quantity",
+                "currency",
+                "item-price",
+                "order-status",
+            },
+            aliases={
+                "purchase-date": "report_date",
+                "sku": "sku",
+                "asin": "asin",
+                "product-name": "product_name",
+                "quantity": "units_ordered",
+                "currency": "currency",
+                "item-price": "ordered_product_sales",
+                "order-status": "order_status",
+                "amazon-order-id": "amazon_order_id",
+            },
+        )
+    ],
     ReportType.INVENTORY_REPORT: [
         ReportSchema(
             version="inventory_report.v1",

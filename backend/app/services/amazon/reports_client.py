@@ -56,8 +56,9 @@ class AmazonReportsClient:
             "marketplaceIds": marketplace_ids,
             "dataStartTime": f"{date_range_start.isoformat()}T00:00:00Z",
             "dataEndTime": f"{date_range_end.isoformat()}T23:59:59Z",
-            "reportOptions": report_options,
         }
+        if report_options:
+            payload["reportOptions"] = report_options
         response = self._request(
             "POST",
             "/reports/2021-06-30/reports",

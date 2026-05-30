@@ -30,6 +30,22 @@ REPORT_TYPES = {
         pii_risk="none",
         notes="V5 first supported SP-API report. Does not include buyer PII.",
     ),
+    "orders_by_date": SPAPIReportType(
+        internal_report_type="orders_by_date",
+        amazon_report_type="GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL",
+        display_name="All Orders Report (by order date)",
+        role_group="Product Listing, Pricing, Inventory and Order Tracking",
+        source="sp_api_reports",
+        output_format="tsv",
+        parser_version="orders.v1",
+        normalizer_version="orders.v1",
+        status="enabled",
+        pii_risk="low",
+        notes=(
+            "Phase 1 primary data source. Buyer address/PII columns are dropped "
+            "during normalization; only SKU/quantity/amount/status are retained."
+        ),
+    ),
     "open_listings": SPAPIReportType(
         internal_report_type="open_listings",
         amazon_report_type="GET_FLAT_FILE_OPEN_LISTINGS_DATA",

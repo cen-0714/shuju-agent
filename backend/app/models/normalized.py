@@ -29,6 +29,27 @@ class NormalizedBusinessDaily(Base):
     marketplace = relationship("Marketplace")
 
 
+class NormalizedOrderDaily(Base):
+    __tablename__ = "normalized_order_daily"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    raw_dataset_id: Mapped[int] = mapped_column(ForeignKey("raw_datasets.id"))
+    seller_account_id: Mapped[int] = mapped_column(ForeignKey("seller_accounts.id"))
+    marketplace_id: Mapped[int] = mapped_column(ForeignKey("marketplaces.id"))
+    report_date: Mapped[date] = mapped_column(Date, index=True)
+    sku: Mapped[str] = mapped_column(String(120), index=True)
+    asin: Mapped[str | None] = mapped_column(String(20))
+    product_name: Mapped[str | None] = mapped_column(String(500))
+    currency: Mapped[str] = mapped_column(String(3))
+    units_ordered: Mapped[int] = mapped_column(default=0)
+    ordered_product_sales: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    order_count: Mapped[int] = mapped_column(default=0)
+
+    raw_dataset = relationship("RawDataset")
+    seller_account = relationship("SellerAccount")
+    marketplace = relationship("Marketplace")
+
+
 class NormalizedInventoryDaily(Base):
     __tablename__ = "normalized_inventory_daily"
 

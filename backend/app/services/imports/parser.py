@@ -19,6 +19,8 @@ def parse_report_file(path: Path) -> ParsedReportFile:
     suffix = path.suffix.lower()
     if suffix == ".csv":
         frame = pd.read_csv(path, dtype=str).fillna("")
+    elif suffix == ".tsv":
+        frame = pd.read_csv(path, sep="\t", dtype=str).fillna("")
     elif suffix in {".xlsx", ".xls"}:
         frame = pd.read_excel(path, dtype=str).fillna("")
     elif suffix == ".json":

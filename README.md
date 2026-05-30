@@ -6,16 +6,17 @@
 
 - 店铺配置：维护 `Seller Account + Marketplace`，支持美洲站基础市场信息。
 - 手动导入：支持 Business Report、Inventory Report、Ads Search Term Report 的 CSV/XLSX 预览与确认导入。
-- 数据持久化：保存原始文件、原始行、标准化后的业务/库存/广告搜索词数据。
+- 数据持久化：保存原始文件、原始行、标准化后的业务/库存/广告搜索词数据；Orders 原始层仅用于内部对账和重算。
 - 导入删除：删除导入会移除原始文件和相关明细数据，并把受影响报告标记为 `stale`。
-- 报告生成：支持单店铺/全部店铺、单日/日期范围报告。
-- 报告下载：支持 Markdown 查看和 Excel 下载，Excel 包含 AI Insights、Action Checklist、Data Warnings、Sync Jobs。
+- 报告生成：支持单店铺/全部店铺、单日/日期范围报告，可选数据源（订单 / 销售流量）。
+- 订单销售趋势：基于 SP-API 全部订单报表，输出日/周/月销售趋势和 SKU 表现，多币种分列。
+- 报告下载：支持 Markdown 查看和 Excel 下载，Excel 包含 Sales Trend、SKU Performance、AI Insights、Action Checklist、Data Warnings、Sync Jobs。
 - LLM 分析：支持 OpenAI-compatible 接口；Prompt 按版本文件管理，输出按 JSON schema 校验。
 - Amazon SP-API 自授权：支持录入 Amazon 后台生成的 refresh token，并加密保存。
-- SP-API 同步：支持手动创建并运行 `GET_SALES_AND_TRAFFIC_REPORT` 同步任务，下载后进入 RawDataset 和标准化管线。
+- SP-API 同步：支持手动创建并运行 `GET_SALES_AND_TRAFFIC_REPORT` 和 `GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL` 同步任务，下载后进入 RawDataset 和标准化管线。
 - 页面入口：Dashboard、Data Import、SP-API Sync、Report Center、Settings 五个服务端页面。
 
-暂未实现：自动定时同步、后台异步任务队列、Ads API 自动拉取、登录权限、推送通知、买家 PII 数据、Amazon 写操作。
+暂未实现：自动定时同步、后台异步任务队列、Ads API 自动拉取、登录权限、推送通知、Orders raw 脱敏/保留期策略、Amazon 写操作。
 
 ## 环境要求
 
@@ -166,6 +167,16 @@ Ads Search Term Report 必需列：
 - `Clicks`
 - `Spend`
 
+Orders Report（SP-API TSV）必需列：
+
+- `purchase-date`
+- `sku`
+- `quantity`
+- `currency`
+- `item-price`
+- `order-status`
+- `amazon-order-id`
+
 ## LLM 配置
 
 `backend\.env` 可配置：
@@ -184,11 +195,25 @@ LLM_TIMEOUT_SECONDS=30
 
 系统使用内部自授权流程，不做 SaaS，不做外部卖家点击授权。Amazon 后台生成的 refresh token 会加密保存。V5 使用该 refresh token 换取 LWA access token，并手动触发 Reports API 同步。
 
-当前 V5 只开放：
+当前已开放：
 
 ```text
 business_sales_traffic -> GET_SALES_AND_TRAFFIC_REPORT
+orders_by_date         -> GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL
 ```
+
+API 可用性说明（已实测）：
+
+- 该账号未注册品牌（Brand Registry），`GET_SALES_AND_TRAFFIC_REPORT`（品牌分析类）对其永久返回 403，因此销售流量报表不可用。
+- 全部订单报表 `GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL` 已验证可用（TSV 输出），作为 Phase 1 主数据源，用于订单销售趋势分析。
+- 订单报表可能含买家地址等 PII 列。当前内部版本保留 raw 原始文件和 `RawReportRow` 便于重算、排错、对账；标准化层、报告、Excel、LLM snapshot 只使用 SKU/数量/金额/币种/订单状态等非买家维度字段。
+
+Raw 数据边界：
+
+- `backend/storage/raw` 保存 Amazon 返回的原始文件，`raw_report_rows.row_json` 保存解析后的原始行。
+- UI/API/Excel/LLM 不返回、不读取 Orders raw PII 字段，只读取 `NormalizedOrderDaily` 聚合后的日/SKU/币种数据。
+- 当前定位是内部自用、只连自己的店铺、不做 SaaS；因此 raw 层保留原始文件是对账和审计取舍，不作为当前版本阻塞项。
+- 如果未来公开部署、多租户或过隐私审查，应增加 `ORDERS_RAW_MODE=keep|redact`、`RAW_RETENTION_DAYS`、raw storage 加密、访问控制和定期清理。
 
 Listing、库存、财务、FBA 报表仍处于 disabled 状态，等对应 parser 和清洗规则明确后再开放。
 
@@ -243,8 +268,10 @@ V5 已知边界：
 
 - 已完成：内部 refresh token 录入、Fernet 加密保存、授权列表安全返回、授权删除。
 - 已完成：手动 SP-API 同步任务、Reports API 创建/轮询/下载、Sales and Traffic 报表入库。
+- 已完成：全部订单报表（Orders）TSV 入库、订单销售趋势（日/周/月）和 SKU 表现分析、多币种分列。
 - 已完成：LLM Prompt 版本化、结构化输出校验、AI Insights Excel 输出。
-- 未完成：自动定时同步、后台队列、Ads API、Orders API、买家 PII、Amazon 写操作。
+- 未完成：自动定时同步、后台队列、Ads API、Orders raw 脱敏/保留期策略、Amazon 写操作。
+- 未完成：退款净额、广告归因、汇率换算、库存/财务报表。
 - 未完成：生产登录系统、密钥轮换、Amazon 侧授权撤销检测。
 
 ## 目录结构

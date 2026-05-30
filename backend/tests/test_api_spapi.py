@@ -20,7 +20,8 @@ def test_report_types_endpoint_returns_only_enabled_types() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert [item["internal_report_type"] for item in payload] == ["business_sales_traffic"]
+    internal_types = {item["internal_report_type"] for item in payload}
+    assert internal_types == {"business_sales_traffic", "orders_by_date"}
     assert "open_listings" not in response.text
 
 

@@ -63,6 +63,7 @@ def test_reports_api_flow(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
         json={
             "scope_type": "single_store",
             "report_kind": "single_day",
+            "data_source": "business",
             "report_start_date": "2026-05-25",
             "report_end_date": "2026-05-25",
             "seller_account_id": seller["id"],
@@ -82,3 +83,20 @@ def test_reports_api_flow(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     assert markdown_response.status_code == 200
     assert excel_response.status_code == 200
     assert "Daily Amazon Report" in markdown_response.text
+
+
+def test_reports_generate_rejects_unknown_data_source() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/api/reports/generate",
+        json={
+            "scope_type": "all_stores",
+            "report_kind": "date_range",
+            "data_source": "typo",
+            "report_start_date": "2026-05-25",
+            "report_end_date": "2026-05-26",
+        },
+    )
+
+    assert response.status_code == 422

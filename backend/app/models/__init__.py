@@ -7,6 +7,7 @@ from app.models.normalized import (
     NormalizedAdsSearchTermDaily,
     NormalizedBusinessDaily,
     NormalizedInventoryDaily,
+    NormalizedOrderDaily,
 )
 from app.models.reports import DailyReport
 from app.models.settings import Marketplace, Organization, SellerAccount
@@ -23,6 +24,7 @@ __all__ = [
     "NormalizedAdsSearchTermDaily",
     "NormalizedBusinessDaily",
     "NormalizedInventoryDaily",
+    "NormalizedOrderDaily",
     "Organization",
     "RawDataset",
     "RawReportRow",

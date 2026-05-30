@@ -1,0 +1,5 @@
+amazon-order-id	purchase-date	sku	asin	product-name	quantity	currency	item-price	order-status
+702-0001	2026-05-28T10:00:00+00:00	SKU-1	B0AAA	Glass Globe	2	USD	20.00	Shipped
+702-0002	2026-05-28T12:30:00+00:00	SKU-1	B0AAA	Glass Globe	1	USD	10.00	Pending
+702-0003	2026-05-28T15:00:00+00:00	SKU-2	B0BBB	Widget	1	CAD	40.00	Shipped
+702-0004	2026-05-28T16:00:00+00:00	SKU-3	B0CCC	Cancelled Item	5	USD	99.00	Cancelled

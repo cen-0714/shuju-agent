@@ -36,6 +36,7 @@ def test_generate_single_store_single_day_report(tmp_path: Path) -> None:
                 report_kind=ReportKind.SINGLE_DAY,
                 report_start_date=date(2026, 5, 25),
                 report_end_date=date(2026, 5, 25),
+                data_source="business",
                 seller_account_id=seller.id,
                 marketplace_id=marketplace.id,
             ),
@@ -83,6 +84,7 @@ def test_generate_all_stores_date_range_report(tmp_path: Path) -> None:
                 report_kind=ReportKind.DATE_RANGE,
                 report_start_date=date(2026, 5, 25),
                 report_end_date=date(2026, 5, 26),
+                data_source="business",
             ),
         )
         session.commit()
@@ -110,6 +112,7 @@ def test_generate_report_fails_without_data(tmp_path: Path) -> None:
                     report_kind=ReportKind.SINGLE_DAY,
                     report_start_date=date(2026, 5, 25),
                     report_end_date=date(2026, 5, 25),
+                    data_source="business",
                 ),
             )
         except ValueError as exc:

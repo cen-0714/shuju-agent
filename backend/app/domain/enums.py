@@ -15,6 +15,7 @@ class DataSource(StrEnum):
 
 class ReportType(StrEnum):
     BUSINESS_REPORT = "business_report"
+    ORDERS_REPORT = "orders_report"
     INVENTORY_REPORT = "inventory_report"
     ADS_CAMPAIGN_REPORT = "ads_campaign_report"
     ADS_TARGETING_REPORT = "ads_targeting_report"

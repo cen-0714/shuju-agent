@@ -9,7 +9,11 @@ from app.domain.enums import AmazonAuthorizationStatus, SPAPISyncJobErrorCode, S
 from app.models.amazon import AmazonAuthorization, SPAPISyncJob
 from app.models.settings import Marketplace, SellerAccount
 from app.services.amazon.lwa import LWATokenExchangeError
-from app.services.amazon.report_types import ReportTypeDisabledError, require_enabled_report_type
+from app.services.amazon.report_types import (
+    ReportTypeDisabledError,
+    get_report_type,
+    require_enabled_report_type,
+)
 from app.services.amazon.reports_client import AmazonReportsRateLimitError
 from app.services.imports.spapi_ingestion import confirm_spapi_report_import
 
@@ -50,10 +54,13 @@ def create_sync_job(
     if authorization is None:
         raise SPAPISyncJobError("active Amazon authorization not found")
 
-    normalized_options = {
-        "dateGranularity": str(report_options.get("dateGranularity") or "DAY"),
-        "asinGranularity": str(report_options.get("asinGranularity") or "SKU"),
-    }
+    if report_type.output_format == "json":
+        normalized_options = {
+            "dateGranularity": str(report_options.get("dateGranularity") or "DAY"),
+            "asinGranularity": str(report_options.get("asinGranularity") or "SKU"),
+        }
+    else:
+        normalized_options = {}
     sync_job = SPAPISyncJob(
         seller_account=seller,
         marketplace=marketplace,
@@ -158,6 +165,7 @@ def refresh_sync_job(
                 report_document_id=document.report_document_id,
                 compression_algorithm=document.compression_algorithm,
             ).content
+        file_suffix = _report_file_suffix(sync_job.internal_report_type)
         response = confirm_spapi_report_import(
             session=session,
             storage=storage,
@@ -167,7 +175,7 @@ def refresh_sync_job(
             amazon_report_type=sync_job.amazon_report_type,
             date_range_start=sync_job.date_range_start,
             date_range_end=sync_job.date_range_end,
-            original_filename=f"{document.report_document_id}.json",
+            original_filename=f"{document.report_document_id}.{file_suffix}",
             file_bytes=content,
         )
         sync_job.import_job_id = response.import_job_id
@@ -202,3 +210,8 @@ def _mark_failed(sync_job: SPAPISyncJob, error_code: str, error_message: str) ->
     sync_job.status = SPAPISyncJobStatus.FAILED.value
     sync_job.error_code = error_code
     sync_job.error_message = error_message
+
+
+def _report_file_suffix(internal_report_type: str) -> str:
+    output_format = get_report_type(internal_report_type).output_format
+    return "tsv" if output_format == "tsv" else "json"

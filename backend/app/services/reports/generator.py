@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from hashlib import sha256
 from uuid import uuid4
@@ -11,10 +11,15 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.storage import LocalStorageBackend
 from app.domain.enums import LLMStatus, ReportKind, ReportScopeType, ReportStatus
-from app.models.normalized import NormalizedBusinessDaily
+from app.models.normalized import NormalizedBusinessDaily, NormalizedOrderDaily
 from app.models.reports import DailyReport
 from app.models.settings import Marketplace, SellerAccount
-from app.schemas.reports import GenerateReportRequest, StoreDailySummary
+from app.schemas.reports import (
+    GenerateReportRequest,
+    SkuPerformance,
+    StoreDailySummary,
+    TrendPoint,
+)
 from app.services.llm.openai_compatible import OpenAICompatibleLLMProvider
 from app.services.llm.provider import MockLLMProvider
 from app.services.llm.snapshot import build_llm_snapshot
@@ -41,16 +46,29 @@ def generate_report(
     request: GenerateReportRequest,
 ) -> DailyReport:
     _validate_request(request)
-    rows = _query_business_rows(session, request)
-    if not rows:
-        raise ValueError("no business data for requested report scope")
-
-    summaries = _build_store_summaries(rows)
-    document = build_daily_report(
-        report_date=request.report_start_date,
-        store_summaries=summaries,
-        warnings=[],
-    )
+    if request.data_source == "orders":
+        rows = _query_order_rows(session, request)
+        if not rows:
+            raise ValueError("no order data for requested report scope")
+        summaries = _build_order_store_summaries(rows)
+        document = build_daily_report(
+            report_date=request.report_start_date,
+            store_summaries=summaries,
+            warnings=[],
+            data_source="orders",
+            trend=_build_trend(rows, request),
+            sku_performance=_build_sku_performance(rows),
+        )
+    else:
+        rows = _query_business_rows(session, request)
+        if not rows:
+            raise ValueError("no business data for requested report scope")
+        summaries = _build_store_summaries(rows)
+        document = build_daily_report(
+            report_date=request.report_start_date,
+            store_summaries=summaries,
+            warnings=[],
+        )
     settings = Settings()
     snapshot = build_llm_snapshot(document)
     if settings.LLM_PROVIDER == "mock":
@@ -141,6 +159,166 @@ def _query_business_rows(
             NormalizedBusinessDaily.marketplace_id == request.marketplace_id,
         )
     return list(session.scalars(query))
+
+
+def _query_order_rows(
+    session: Session,
+    request: GenerateReportRequest,
+) -> list[NormalizedOrderDaily]:
+    query = select(NormalizedOrderDaily).where(
+        NormalizedOrderDaily.report_date >= request.report_start_date,
+        NormalizedOrderDaily.report_date <= request.report_end_date,
+    )
+    if request.scope_type == ReportScopeType.SINGLE_STORE:
+        query = query.where(
+            NormalizedOrderDaily.seller_account_id == request.seller_account_id,
+            NormalizedOrderDaily.marketplace_id == request.marketplace_id,
+        )
+    return list(session.scalars(query))
+
+
+def _build_order_store_summaries(
+    rows: list[NormalizedOrderDaily],
+) -> list[StoreDailySummary]:
+    grouped: dict[tuple[int, int, str], dict[str, object]] = {}
+    for row in rows:
+        key = (row.seller_account_id, row.marketplace_id, row.currency)
+        bucket = grouped.get(key)
+        if bucket is None:
+            bucket = {
+                "seller_name": row.seller_account.display_name,
+                "marketplace_key": row.marketplace.marketplace_id,
+                "data_status": row.raw_dataset.data_status,
+                "ordered_product_sales": Decimal("0"),
+                "units_ordered": 0,
+            }
+            grouped[key] = bucket
+        bucket["ordered_product_sales"] = (
+            Decimal(bucket["ordered_product_sales"]) + row.ordered_product_sales
+        )
+        bucket["units_ordered"] = int(bucket["units_ordered"]) + row.units_ordered
+
+    summaries: list[StoreDailySummary] = []
+    for (seller_account_id, _marketplace_id, currency), bucket in grouped.items():
+        summaries.append(
+            StoreDailySummary(
+                seller_account_id=seller_account_id,
+                seller_name=str(bucket["seller_name"]),
+                marketplace_id=str(bucket["marketplace_key"]),
+                currency=currency,
+                ordered_product_sales=Decimal(bucket["ordered_product_sales"]),
+                units_ordered=int(bucket["units_ordered"]),
+                data_status=str(bucket["data_status"]),
+            )
+        )
+    return sorted(summaries, key=lambda item: (item.seller_name, item.currency or ""))
+
+
+def _build_trend(
+    rows: list[NormalizedOrderDaily],
+    request: GenerateReportRequest,
+) -> list[TrendPoint]:
+    if request.report_kind == ReportKind.SINGLE_DAY:
+        return _trend_by_granularity(rows, "day")
+    points: list[TrendPoint] = []
+    for granularity in ("day", "week", "month"):
+        points.extend(_trend_by_granularity(rows, granularity))
+    return points
+
+
+def _trend_by_granularity(
+    rows: list[NormalizedOrderDaily],
+    granularity: str,
+) -> list[TrendPoint]:
+    grouped: dict[tuple[str, str], dict[str, object]] = {}
+    for row in rows:
+        label, period_start, period_end = _period_bounds(row.report_date, granularity)
+        key = (label, row.currency)
+        bucket = grouped.get(key)
+        if bucket is None:
+            bucket = {
+                "period_start": period_start,
+                "period_end": period_end,
+                "ordered_product_sales": Decimal("0"),
+                "units_ordered": 0,
+                "order_count": 0,
+            }
+            grouped[key] = bucket
+        bucket["ordered_product_sales"] = (
+            Decimal(bucket["ordered_product_sales"]) + row.ordered_product_sales
+        )
+        bucket["units_ordered"] = int(bucket["units_ordered"]) + row.units_ordered
+        bucket["order_count"] = int(bucket["order_count"]) + row.order_count
+
+    points = [
+        TrendPoint(
+            period_label=label,
+            period_start=bucket["period_start"],  # type: ignore[arg-type]
+            period_end=bucket["period_end"],  # type: ignore[arg-type]
+            currency=currency,
+            ordered_product_sales=Decimal(bucket["ordered_product_sales"]),
+            units_ordered=int(bucket["units_ordered"]),
+            order_count=int(bucket["order_count"]),
+        )
+        for (label, currency), bucket in grouped.items()
+    ]
+    return sorted(points, key=lambda item: (item.period_start, item.currency))
+
+
+def _period_bounds(day: date, granularity: str) -> tuple[str, date, date]:
+    if granularity == "day":
+        return (f"D:{day.isoformat()}", day, day)
+    if granularity == "week":
+        iso_year, iso_week, iso_weekday = day.isocalendar()
+        monday = day - timedelta(days=iso_weekday - 1)
+        sunday = monday + timedelta(days=6)
+        return (f"W:{iso_year}-W{iso_week:02d}", monday, sunday)
+    # month
+    first = day.replace(day=1)
+    if day.month == 12:
+        next_first = day.replace(year=day.year + 1, month=1, day=1)
+    else:
+        next_first = day.replace(month=day.month + 1, day=1)
+    last = next_first - timedelta(days=1)
+    return (f"M:{day.year}-{day.month:02d}", first, last)
+
+
+def _build_sku_performance(
+    rows: list[NormalizedOrderDaily],
+) -> list[SkuPerformance]:
+    grouped: dict[tuple[str, str], dict[str, object]] = {}
+    for row in rows:
+        key = (row.sku, row.currency)
+        bucket = grouped.get(key)
+        if bucket is None:
+            bucket = {
+                "asin": row.asin,
+                "product_name": row.product_name,
+                "units_ordered": 0,
+                "ordered_product_sales": Decimal("0"),
+            }
+            grouped[key] = bucket
+        bucket["units_ordered"] = int(bucket["units_ordered"]) + row.units_ordered
+        bucket["ordered_product_sales"] = (
+            Decimal(bucket["ordered_product_sales"]) + row.ordered_product_sales
+        )
+
+    performance = [
+        SkuPerformance(
+            sku=sku,
+            asin=bucket["asin"],  # type: ignore[arg-type]
+            product_name=bucket["product_name"],  # type: ignore[arg-type]
+            currency=currency,
+            units_ordered=int(bucket["units_ordered"]),
+            ordered_product_sales=Decimal(bucket["ordered_product_sales"]),
+        )
+        for (sku, currency), bucket in grouped.items()
+    ]
+    return sorted(
+        performance,
+        key=lambda item: item.ordered_product_sales,
+        reverse=True,
+    )
 
 
 def _build_store_summaries(rows: list[NormalizedBusinessDaily]) -> list[StoreDailySummary]:
